@@ -95,5 +95,17 @@ julia> sprofile_flat(true)
      4                 none                         myfunc      3
 ```
 
+You can accumulate the results of multiple calls, and view the combined results with these functions. If you want to start from scratch, use `sprofile_clear()`. 
+
+The sampling profiler just accumulates snapshots, and the analysis only happens when you ask for the report with `sprofile_tree` or `sprofile_flat`. For a long-running computation, it's entirely possible that the pre-allocated buffer for storing snapshots will be filled. If that happens, the snapshots stop, but your computation continues. As a consequence, you may miss some important profiling data, although you will get a warning when that happens.
+
+You can adjust the behavior by calling
+
+```julia
+sprofile_init(delay, nsamples)
+```
+
+where both parameters are integers. `delay` is expressed in nanoseconds. The larger `nsamples`, the larger your memory requirements for the buffer.
+
 [Julia]: http://julialang.org "Julia"
 [wp]: http://en.wikipedia.org/wiki/Profiling_(computer_programming)

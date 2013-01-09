@@ -21,7 +21,7 @@ if !isfile(libname)
 end
 const libprofile = libname
 
-function profile_init(delay::Integer, nsamples::Integer)
+function sprofile_init(delay::Integer, nsamples::Integer)
     status = ccall((:sprofile_init, libprofile), Void, (Uint64, Uint), delay, nsamples)
     if status == -1
         error("Could not allocate space for ", nsamples, " profiling samples")
@@ -54,7 +54,7 @@ function sprofile_get()
     len = sprofile_len_data()
     maxlen = sprofile_maxlen_data()
     if (len == maxlen)
-        warn("the profile data buffer is full; profiling probably terminated\nbefore your program finished. To profile for longer runs, call profile_init()\nwith a larger buffer and/or larger delay.")
+        warn("the profile data buffer is full; profiling probably terminated\nbefore your program finished. To profile for longer runs, call sprofile_init()\nwith a larger buffer and/or larger delay.")
     end
     pointer_to_array(sprofile_get_data_pointer(), (len,))
 end
@@ -65,7 +65,7 @@ end
 const delay = 1_000_000
 # Use a max size of 1M profile samples
 const nsamples = 1_000_000
-profile_init(delay, nsamples)
+sprofile_init(delay, nsamples)
 
 
 ## A simple linecount parser
