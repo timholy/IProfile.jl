@@ -96,7 +96,7 @@ function sprof_flat(doCframes::Bool)
 end
 
 function sprofile_flat(doCframes::Bool)
-    bn, n = sprof_flat(doCframes)
+    bt, n = sprof_flat(doCframes)
     # Sort
     comb = Array(ASCIIString, length(n))
     for i = 1:length(n)
