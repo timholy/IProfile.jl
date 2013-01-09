@@ -7,9 +7,15 @@ CC=gcc
 JULIALIBS=
 CFLAGS=-Wall -I $(INCPATH)
 LDFLAGS=-Wl,-rpath,$(JULIALIBS) -L$(JULIALIBS)
+LINKLIBS=
+
+platform=$(shell uname -o)
+ifeq ($(platform),GNU/Linux)
+	LINKLIBS += -lrt
+endif
 
 profile: profile.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -O2 -shared -fPIC profile.c -lrt -ljulia-release -o libprofile.so
+	$(CC) $(CFLAGS) $(LDFLAGS) -O2 -shared -fPIC profile.c $(LINKLIBS) -ljulia-release -o libprofile.so
 
 clean:
 	-rm libprofile.so
