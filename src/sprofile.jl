@@ -2,7 +2,7 @@ module SProfile
 
 ## Wrap the C library
 fnames = ["libprofile.so", "libprofile.dylib", "libprofile.dll"]
-paths = [pwd(), joinpath("Profile", "src")]
+paths = [pwd(), joinpath(julia_pkgdir(), "Profile", "src")]
 global libname
 found = false
 for path in paths
