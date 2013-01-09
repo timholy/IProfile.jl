@@ -2,12 +2,17 @@
 
 This package contains profiling tools for the [Julia][Julia] language. Profilers are mainly used for code optimization, particularly to find bottlenecks.
 
-This package implements two [types of profilers](http://en.wikipedia.org/wiki/Profiling_(computer_programming)), an "instrumenting" profiler and a "sampling" (statistical) profiler. Here are some of the key points:
+This package implements two [types of profilers][wp], an "instrumenting" profiler and a "sampling" (statistical) profiler.
 
-- The instrumenting profiler provides detailed, line-by-line information, including the number of times each line gets executed and the total run time.
-- The instrumenting profiler has a significant performance overhead, and requires that your code be (automatically) modified by encapsulating it in "@iprofile begin...end".
-- The sampling profiler grabs "snapshots" during the execution of any task, extracting the function and its line number for each snapshot. Line numbers that occur frequently are indicative of a step in your computation that consumes significant resources. These snapshots occur at intervals (by default, 1 ms) and hence do not provide complete line-by-line coverage.
-- The sampling profiler requires no code modifications, and hence can profile into Julia's core code and even (optionally) into C libraries.
+### Instrumenting profiler
+
+The instrumenting profiler provides detailed information, including the number of times each line gets executed and the total run time. However, the instrumenting profiler requires that your code be (automatically) modified by encapsulating it in "@iprofile begin...end". It also has a significant performance cost.
+
+### Sampling profiler
+
+The sampling profiler works by grabbing "snapshots" during the execution of any task. Each "snapshot" extracts the currently-running function line number. Lines that occur frequently are indicative of a step in your computation that consumes significant resources.
+
+On the downside, these snapshots occur at intervals (by default, 1 ms) and hence do not provide complete line-by-line coverage. On the upside, the sampling profiler requires no code modifications. As an important consequence, it can profile into Julia's core code and even (optionally) into C libraries. Finally, by running "infrequently" there is very little performance overhead.
 
 ## Installation
 
@@ -89,3 +94,4 @@ julia> sprofile_flat(true)
 ```
 
 [Julia]: http://julialang.org "Julia"
+[wp]: http://en.wikipedia.org/wiki/Profiling_(computer_programming)
