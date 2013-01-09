@@ -105,7 +105,7 @@ You can adjust the behavior by calling
 sprofile_init(delay, nsamples)
 ```
 
-where both parameters are integers. `delay` is expressed in nanoseconds. The larger `nsamples`, the larger your memory requirements for the buffer.
+where both parameters are integers. `delay` is expressed in nanoseconds, and is the amount of time that Julia gets between snapshots to perform the requested computations. (A very long-running job might not need such frequent snapshots.) The larger `nsamples`, the more snapshots you can take, at the cost of larger memory requirements.
 
 [Julia]: http://julialang.org "Julia"
 [wp]: http://en.wikipedia.org/wiki/Profiling_(computer_programming)
