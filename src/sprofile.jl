@@ -28,7 +28,7 @@ function profile_init(delay::Integer, nsamples::Integer)
     end
 end
 
-sprofile_start_timer() = ccall((:sprofile_start_timer, libprofile), Void, ())
+sprofile_start_timer() = ccall((:sprofile_start_timer, libprofile), Int32, ())
 
 sprofile_stop_timer() = ccall((:sprofile_stop_timer, libprofile), Void, ())
 
@@ -54,7 +54,7 @@ function sprofile_get()
     len = sprofile_len_data()
     maxlen = sprofile_maxlen_data()
     if (len == maxlen)
-        println("Warning: the profile data buffer is full; profiling probably terminated\nbefore your program finished. To profile for longer runs, call profile_init()\nwith a larger buffer and/or larger delay.")
+        warn("the profile data buffer is full; profiling probably terminated\nbefore your program finished. To profile for longer runs, call profile_init()\nwith a larger buffer and/or larger delay.")
     end
     pointer_to_array(sprofile_get_data_pointer(), (len,))
 end
@@ -81,8 +81,8 @@ function sprof_flat(doCframes::Bool)
     buf = Array(Uint, 0)
     n = Array(Int, 0)
     for (k,v) in linecount
-        push(buf, k)
-        push(n, v)
+        push!(buf, k)
+        push!(n, v)
     end
     bt = Array(Any, length(buf))
     for i = 1:length(buf)
@@ -126,8 +126,8 @@ function sprof_tree()
     bt = Array(Vector{Uint}, 0)
     counts = Array(Int, 0)
     for (k,v) in treecount
-        push(bt, k)
-        push(counts, v)
+        push!(bt, k)
+        push!(counts, v)
     end
     bt, counts
 end
