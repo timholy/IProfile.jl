@@ -1,3 +1,5 @@
 usr, bin = splitdir(JULIA_HOME)
+base, tmp = splitdir(usr)
 jllib = joinpath(usr, "lib")
-run(`make JULIALIBS=$jllib`)
+incpath = joinpath(base, "src")
+run(`make JULIALIBS=$jllib INCPATH=$incpath`)

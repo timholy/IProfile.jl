@@ -1,28 +1,68 @@
-#if defined(__WIN32__)
-//Presumably needs an entirely different implementation on Windows
-#else
+#include "support/dtypes.h"
 #include <stdlib.h>
-#include <signal.h>
-#include <time.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/types.h>
-
-#ifdef __LP64__
-typedef int64_t ptrint_t;
-#else
-typedef int32_t ptrint_t;
-#endif
 
 extern size_t rec_backtrace(ptrint_t *bt_data, size_t maxsize);
-
-static timer_t timerprof;
-static struct itimerspec itsprof;
 
 static ptrint_t* bt_data_prof = NULL;
 static size_t bt_size_max = 0;
 static size_t bt_size_cur = 0;
 static u_int64_t nsecprof;
+
+//
+// Timer section
+//
+#if defined(__WIN32__)
+//Need timer implementation for windows
+#else
+#include <signal.h>
+#if defined (__APPLE__) || defined(__FreeBSD___)
+#include <sys/time.h>
+struct itimerval timerprof;
+int running;
+
+// The handler function, called whenever the profiling timer elapses
+static void sprofile_bt(int dummy)
+{
+    // Get backtrace data
+    bt_size_cur += rec_backtrace(bt_data_prof+bt_size_cur, bt_size_max-bt_size_cur-1);
+    // Mark the end of this block with 0
+    bt_data_prof[bt_size_cur] = 0;
+    bt_size_cur++;
+    // Re-arm the  timer
+    if (running && bt_size_cur < bt_size_max) {
+        timerprof.it_value.tv_usec = nsecprof/1000;
+        setitimer(ITIMER_REAL, &timerprof, 0);
+        signal(SIGALRM, sprofile_bt);
+    }
+}
+
+int sprofile_start_timer(void)
+{
+    timerprof.it_interval.tv_sec = 0;
+    timerprof.it_interval.tv_usec = 0;
+    timerprof.it_value.tv_sec = 0;
+    timerprof.it_value.tv_usec = nsecprof/1000;
+    if (setitimer(ITIMER_REAL, &timerprof, 0) == -1)
+        return -3;
+
+    running = 1;
+    signal(SIGALRM, sprofile_bt);
+
+    return 0;
+}
+
+void sprofile_stop_timer(void)
+{
+    running = 0;
+}
+#else
+// Linux implementation. Linux can use the BSD timers, but this is
+// the more careful approach.
+#include <time.h>
+#include <string.h>  // for memset
+
+static timer_t timerprof;
+static struct itimerspec itsprof;
 
 // The handler function, called whenever the profiling timer elapses
 static void sprofile_bt(int signal, siginfo_t *si, void *uc)
@@ -69,7 +109,7 @@ int sprofile_start_timer(void)
     itsprof.it_value.tv_nsec = nsecprof;
     if (timer_settime(timerprof, 0, &itsprof, NULL) == -1)
         return -3;
-    
+
     return 0;
 }
 
@@ -77,7 +117,12 @@ void sprofile_stop_timer(void)
 {
     timer_delete(timerprof);
 }
+#endif
+#endif
 
+//
+// Utility functions
+//
 int sprofile_init(size_t maxsize, u_int64_t nsec)
 {
     bt_size_max = maxsize;
@@ -109,4 +154,3 @@ void sprofile_clear_data(void)
 {
     bt_size_cur = 0;
 }
-#endif

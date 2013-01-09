@@ -1,9 +1,11 @@
 # Build with something like:
-#   make JULIALIBS=~/src/julia/usr/lib
+#   make JULIALIBS=~/src/julia/usr/lib INCPATH=~/src/julia/src
+# Calling require("postinstall.jl") from within Julia should handle
+# this for you.
 
 CC=gcc
 JULIALIBS=
-CFLAGS=-Wall
+CFLAGS=-Wall -I $(INCPATH)
 LDFLAGS=-Wl,-rpath,$(JULIALIBS) -L$(JULIALIBS)
 
 profile: profile.c
