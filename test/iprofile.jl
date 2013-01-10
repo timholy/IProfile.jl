@@ -23,3 +23,13 @@ function f1{T}(x::T)
     return x+5
 end
 end #@iprofile begin
+
+f1(7)
+f1(7.3)
+
+for i = 1:200
+    f1(int16(i))
+end
+
+@iprofile report
+@iprofile clear
