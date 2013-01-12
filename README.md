@@ -23,7 +23,7 @@ Pkg.init()     # if you've never installed a package before
 Pkg.add("Profile")
 ```
 
-*You also need to compile a C library.* Within the `Profile/src` directory, type `include("postinstall.jl")` from the Julia prompt.
+**You also need to compile a C library.** Within the `Profile/src` directory, type `include("postinstall.jl")` from the Julia prompt.
 
 ## Using the sampling profiler
 
@@ -58,9 +58,9 @@ julia> sprofile_tree(true)
                   2 array.jl; sum; line: 1386
                   1 array.jl; sum; line: 1386
 ```
-The `true` as an argument causes it to include C functions in the results; if you simply call `sprofile_tree()` by default it will exclude C functions.
+The `true` as an argument causes it to include C functions in the results; if you simply call `sprofile_tree()`, or `sprofile_tree(false)`, it will exclude C functions.
 
-Here's how to interpret these results: the first column indicates the number of samples taken, the second the filename followed by a semicolon, the third the function name followed by a semicolon, and the fourth the line number (or, for C code, the instruction offset in hex). Long paths and function names are truncated at their beginning, showing "...", and the display is set to fit inside the width of your terminal (so your results may look slightly different). Each sub-function call indents an additional space. There are some situations in which the backtrace line cannot be not resolved to a function name, and these lines are not shown; however, their existence in the nesting hierarchy can be inferred from an increase in the indentation by more than one space. In some cases, you may see things like "+n" (where n is a number) prepended to one or more lines; that's an indication that it should have indented another n spaces, but ran out of room. 
+Here's how to interpret these results: the first "field" indicates the number of samples taken, the second the filename followed by a semicolon, the third the function name followed by a semicolon, and the fourth the line number (or, for C code, the instruction offset in hex). Long paths and function names are truncated at their beginning, showing "...", and the display is set to fit inside the width of your terminal (so your results may look slightly different). Each sub-function call indents an additional space. There are some situations in which the backtrace line cannot be not resolved to a function name, and these lines are not shown; however, their existence in the nesting hierarchy can be inferred from an increase in the indentation by more than one space. In some cases, you may see things like "+n" (where n is a number) prepended to one or more lines; that's an indication that it should have indented another n spaces, but ran out of room. 
 
 In this specific case, there were 12 "samples" taken during the running of `myfunc`. The top level was in the system's `libc`, in `__libc_start_main`, which then calls `julia_trampoline`, which in turn calls our first Julia function, `_start`, in `client.jl`. Progressing a little further, `eval_user_input` is the function that gets evaluated each time you type something on the REPL, so this is essentially the "parent" of all activity that you initiate from the REPL. Each one of these shows 12 samples, meaning that each snapshot captured a state "inside" these functions.
 
@@ -79,9 +79,9 @@ Line 3 of `myfunc` contains the call to `sum`, and there were 4 (out of 12) snap
 ```julia
         v += A[i]
 ```
-and therefore has multiple operations, the "reference" `A[i]` and the summation. Both of these operations are generated directly by the compiler and do not require any function calls, so they are at the lowest level of the backtrace. But because they are separate operations, they get two listings. This can be useful in spotting cases where multiple operations on the same line require vastly different execution times.
+and therefore contains multiple operations, the "reference" `A[i]` and the summation. Both of these operations are generated directly by the compiler and do not require any function calls, so they are at the lowest level of the backtrace. But because they are separate operations, they get two listings. This can be useful in spotting cases where multiple operations on the same line require vastly different execution times.
 
-Overall, we can tentatively conclude than random number generation is something like twice as expensive as the sum operation. To get better statistics, we'd want to run this multiple times.
+Overall, we can tentatively conclude that random number generation is something like twice as expensive as the sum operation. To get better statistics, we'd want to run this multiple times.
 
 An alternative way of viewing the results is as a "flat" dump:
 ```julia
