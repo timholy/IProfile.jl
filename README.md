@@ -23,7 +23,7 @@ Pkg.init()     # if you've never installed a package before
 Pkg.add("Profile")
 ```
 
-You also need to compile a C library. Within the `Profile/src` directory, type `include("postinstall.jl")` from the Julia prompt.
+*You also need to compile a C library.* Within the `Profile/src` directory, type `include("postinstall.jl")` from the Julia prompt.
 
 ## Using the sampling profiler
 
@@ -43,54 +43,62 @@ myfunc()  # run once to force compilation
 To get the results, we do this:
 ```
 julia> sprofile_tree(true)
-  12 ...nux-gnu/libc.so.6; __libc_start_main; offset: ed
-      12 ...bjulia-release.so; julia_trampoline; offset: 60
-              12 client.jl; _start; line: 318
-                12 client.jl; run_repl; line: 155
-                      12 client.jl; eval_user_input; line: 82
-                            12 no file; anonymous; line: 193
-                                  4 none; myfunc; line: 3
-                                    1 array.jl; sum; line: 1376
-                                    1 array.jl; sum; line: 1377
-                                    2 array.jl; sum; line: 1377
-                                  8 none; myfunc; line: 2
-                                    8 librandom.jl; dsfmt_gv_fill_array_close_open!; line: 128
-                                      8 .../lib/librandom.so; dsfmt_fill_array_close_open; offset: 17f
+ 12 ...6_64-linux-gnu/libc.so.6; __libc_start_main; offset: 0xed
+   12 ...lib/libjulia-release.so; julia_trampoline; offset: 0x60
+       12 client.jl; _start; line: 318
+        12 client.jl; run_repl; line: 155
+           12 client.jl; eval_user_input; line: 82
+              12 no file; anonymous; line: 248
+                 8 none; myfunc; line: 2
+                  8 librandom.jl; dsfmt_gv_fill_array_close_open!; line: 128
+                   1 .../lib/librandom.so; dsfmt_fill_array_close_open; offset: 0x0166
+                   7 .../lib/librandom.so; dsfmt_fill_array_close_open; offset: 0x017f
+                 4 none; myfunc; line: 3
+                  1 array.jl; sum; line: 1385
+                  2 array.jl; sum; line: 1386
+                  1 array.jl; sum; line: 1386
 ```
 The `true` as an argument causes it to include C functions in the results; if you simply call `sprofile_tree()` by default it will exclude C functions.
 
-Here's how to interpret these results: the first column indicates the number of samples taken, the second the filename, the third the function name, and the fourth the line number (or, for C code, the instruction offset in hex). There were 12 "samples" taken during the running of `myfunc`. The top level was in the system's `libc`, in `__libc_start_main`, which then calls `julia_trampoline`, which in turn calls our first Julia function, `_start`, in `client.jl`. Progressing a little further, `eval_user_input` is the function that gets evaluated each time you type something on the REPL, so this is, in a sense, the "parent" of all activity that you initiate from the REPL. Each one of these shows 12 samples, meaning that each snapshot captured a state "inside" these functions.
+Here's how to interpret these results: the first column indicates the number of samples taken, the second the filename followed by a semicolon, the third the function name followed by a semicolon, and the fourth the line number (or, for C code, the instruction offset in hex). Long paths and function names are truncated at their beginning, showing "...", and the display is set to fit inside the width of your terminal (so your results may look slightly different). Each sub-function call indents an additional space. There are some situations in which the backtrace line cannot be not resolved to a function name, and these lines are not shown; however, their existence in the nesting hierarchy can be inferred from an increase in the indentation by more than one space. In some cases, you may see things like "+n" (where n is a number) prepended to one or more lines; that's an indication that it should have indented another n spaces, but ran out of room. 
+
+In this specific case, there were 12 "samples" taken during the running of `myfunc`. The top level was in the system's `libc`, in `__libc_start_main`, which then calls `julia_trampoline`, which in turn calls our first Julia function, `_start`, in `client.jl`. Progressing a little further, `eval_user_input` is the function that gets evaluated each time you type something on the REPL, so this is essentially the "parent" of all activity that you initiate from the REPL. Each one of these shows 12 samples, meaning that each snapshot captured a state "inside" these functions.
 
 The first "interesting" part is the line
 
 ```
-4 none; myfunc; line: 3
+8 none; myfunc; line: 2
 ```
-`none` refers to the fact that we typed this function in at the REPL, rather than putting it in a file. Line 3 of `myfunc` contains the call to `sum`, and there were 4 (out of 12) snapshots taken here. Below that, you can see the specific places in `base/array.jl` that implement the `sum` function for these inputs.
+`none` refers to the fact that we typed `myfunc` in at the REPL, rather than putting it in a file. Line 2 contains the call to `rand`, and there were 8 (out of 12) snapshots taken here. Below that, you can see a call to `dsfmt_gv_fill_array_close_open!` inside `librandom.jl` and finally down again into a C library. You might be surprised not to see the `rand` function listed explicitly: that's because `rand` is _inlined_, and hence doesn't appear in the backtraces.
 
 A little further down, you see
 ```
-8 none; myfunc; line: 2
+4 none; myfunc; line: 3
 ```
-Line 2 contains the call to `rand`, and there were 8 (out of 12) snapshots taken here. Below that, you can see a call inside `librandom.jl` and finally back down again into a C library. You might be surprised not to see the `rand` function listed explicitly: that's because `rand` is _inlined_, and hence doesn't appear in the backtraces.
+Line 3 of `myfunc` contains the call to `sum`, and there were 4 (out of 12) snapshots taken here. Below that, you can see the specific places in `base/array.jl` that implement the `sum` function for these inputs. Note that there are two listings for line 1386; the code on this line is
+```julia
+        v += A[i]
+```
+and therefore has multiple operations, the "reference" `A[i]` and the summation. Both of these operations are generated directly by the compiler and do not require any function calls, so they are at the lowest level of the backtrace. But because they are separate operations, they get two listings. This can be useful in spotting cases where multiple operations on the same line require vastly different execution times.
 
-So we can conclude than random number generation is something like twice as expensive as the sum operation. To get better statistics, we'd want to run this multiple times.
+Overall, we can tentatively conclude than random number generation is something like twice as expensive as the sum operation. To get better statistics, we'd want to run this multiple times.
 
 An alternative way of viewing the results is as a "flat" dump:
 ```julia
 julia> sprofile_flat(true)
  Count                 File                       Function   Line
     12 ...bjulia-release.so               julia_trampoline     96
-     8 .../lib/librandom.so    dsfmt_fill_array_close_open    383
+     1 .../lib/librandom.so    dsfmt_fill_array_close_open    358
+     7 .../lib/librandom.so    dsfmt_fill_array_close_open    383
     12 ...nux-gnu/libc.so.6              __libc_start_main    237
-     1             array.jl                            sum   1376
-     2             array.jl                            sum   1377
-     1             array.jl                            sum   1377
+     1             array.jl                            sum   1385
+     2             array.jl                            sum   1386
+     1             array.jl                            sum   1386
     12            client.jl                         _start    318
     12            client.jl                eval_user_input     82
     12            client.jl                       run_repl    155
-     8         librandom.jl dsfmt_gv_fill_array_close_open!    128
-    12              no file                      anonymous    193
+     8         librandom.jl ...t_gv_fill_array_close_open!    128
+    12              no file                      anonymous    248
      8                 none                         myfunc      2
      4                 none                         myfunc      3
 ```

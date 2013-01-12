@@ -84,7 +84,7 @@ function sprof_flat(doCframes::Bool)
         push!(buf, k)
         push!(n, v)
     end
-    bt = Array(Any, length(buf))
+    bt = Array(Vector{Any}, length(buf))
     for i = 1:length(buf)
         bt[i] = sprofile_parse(buf[i], doCframes)
     end
@@ -97,17 +97,12 @@ end
 
 function sprofile_flat(doCframes::Bool)
     bt, n = sprof_flat(doCframes)
-    # Sort
-    comb = Array(ASCIIString, length(n))
-    for i = 1:length(n)
-        comb[i] = @sprintf("%s:%s:%06d", bt[i][2], bt[i][1], bt[i][3])
-    end
-    scomb, p = sortperm(comb)
+    p = sprof_sortorder(bt)
     n = n[p]
     bt = bt[p]
     @printf("%6s %20s %30s %6s\n", "Count", "File", "Function", "Line")
     for i = 1:length(n)
-        @printf("%6d %20s %30s %6d\n", n[i], truncto(string(bt[i][2]), 20), bt[i][1], bt[i][3])
+        @printf("%6d %20s %30s %6d\n", n[i], truncto(string(bt[i][2]), 20), truncto(string(bt[i][1]), 30), bt[i][3])
     end
 end
 sprofile_flat() = sprofile_flat(false)
@@ -145,30 +140,90 @@ function sprof_treematch(bt::Vector{Vector{Uint}}, counts::Vector{Int}, pattern:
     matched
 end
 
+sprof_tree_format_linewidth(x::Vector{Any}) = isempty(x) ? 0 : ndigits(x[3])+(isa(x[3],Signed) ? 6 : 11)
+function minbytes(x::Uint)
+    if x <= typemax(Uint8)
+        return uint8(x)
+    elseif x <= typemax(Uint16)
+        return uint16(x)
+    elseif x <= typemax(Uint32)
+        return uint32(x)
+    else
+        return x
+    end
+end
+
+function sprof_tree_format(infoa::Vector{Vector{Any}}, counts::Vector{Int}, level::Int, cols::Integer)
+    nindent = min(ifloor(cols/2), level)
+    ndigcounts = ndigits(max(counts))
+    ndigline = max([sprof_tree_format_linewidth(x) for x in infoa])
+    ntext = cols-nindent-ndigcounts-ndigline-5
+    widthfile = ifloor(0.4ntext)
+    widthfunc = ifloor(0.6ntext)
+    strs = Array(ASCIIString, length(infoa))
+    showextra = false
+    if level > nindent
+        nextra = level-nindent
+        nindent -= ndigits(nextra)+2
+        showextra = true
+    end
+    for i = 1:length(infoa)
+        info = infoa[i]
+        if !isempty(info)
+            base = " "^nindent
+            if showextra
+                base = strcat(base, "+", nextra, " ")
+            end
+            base = strcat(base,
+                          rpad(string(counts[i]), ndigcounts, " "),
+                          " ",
+                          truncto(string(info[2]), widthfile),
+                          "; ",
+                          truncto(string(info[1]), widthfunc),
+                          "; ")
+            if isa(info[3], Signed)
+                strs[i] = strcat(base, "line: ", info[3])
+            else
+                strs[i] = strcat(base, "offset: ", minbytes(info[3]))
+            end
+        else
+            strs[i] = ""
+        end
+    end
+    strs
+end
+sprof_tree_format(infoa::Vector{Vector{Any}}, counts::Vector{Int}, level::Int) = sprof_tree_format(infoa, counts, level, tty_cols())
+
 function sprofile_tree(bt::Vector{Vector{Uint}}, counts::Vector{Int}, level::Int, doCframes::Bool)
     umatched = falses(length(counts))
     len = Int[length(x) for x in bt]
-#     if any(len .< level)
-#         error("level is ", level, " and len = ", len)
-#     end
+    infoa = Array(Vector{Any}, 0)
+    keepa = Array(BitArray, 0)
+    n = Array(Int, 0)
     while !all(umatched)
         ind = findfirst(!umatched)
         pattern = bt[ind][1:level+1]
         matched = sprof_treematch(bt, counts, pattern)
-        n = sum(counts[matched])
         info = sprofile_parse(pattern[end], doCframes)
-        if !isempty(info)
-            if isa(info[3], Signed)
-                @printf("%s%d %s; %s; line: %d\n", "  "^level, n, truncto(string(info[2]), 20), info[1], info[3])
-            else
-                @printf("%s%d %s; %s; offset: %x\n", "  "^level, n, truncto(string(info[2]), 20), info[1], info[3])
-            end
-        end
+        push!(infoa, info)
         keep = matched & (len .> level+1)
+        push!(keepa, keep)
+        umatched |= matched
+        push!(n, sum(counts[matched]))
+    end
+    p = sprof_sortorder(infoa)
+    infoa = infoa[p]
+    keepa = keepa[p]
+    n = n[p]
+    strs = sprof_tree_format(infoa, n, level)
+    for i = 1:length(infoa)
+        if !isempty(strs[i])
+            println(strs[i])
+        end
+        keep = keepa[i]
         if any(keep)
             sprofile_tree(bt[keep], counts[keep], level+1, doCframes)
         end
-        umatched |= matched
     end
 #     print("\n")
 end
@@ -197,12 +252,26 @@ macro sprofile(ex)
     end
 end
 
+# Utilities
 function truncto(str::ASCIIString, w::Int)
     ret = str;
     if strlen(str) > w
-        ret = strcat("...", str[end-16:end])
+        ret = strcat("...", str[end-w+4:end])
     end
     ret
+end
+
+function sprof_sortorder(bt::Vector{Vector{Any}})
+    comb = Array(ASCIIString, length(bt))
+    for i = 1:length(bt)
+        if !isempty(bt[i])
+            comb[i] = @sprintf("%s:%s:%06d", bt[i][2], bt[i][1], bt[i][3])
+        else
+            comb[i] = "zzz"
+        end
+    end
+    scomb, p = sortperm(comb)
+    p
 end
 
 export @sprofile, sprofile_clear, sprofile_flat, sprofile_init, sprofile_tree
