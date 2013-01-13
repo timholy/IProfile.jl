@@ -255,7 +255,7 @@ end
 # Utilities
 function truncto(str::ASCIIString, w::Int)
     ret = str;
-    if strlen(str) > w
+    if length(str) > w
         ret = strcat("...", str[end-w+4:end])
     end
     ret
