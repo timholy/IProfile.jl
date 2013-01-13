@@ -95,17 +95,19 @@ function sprof_flat(doCframes::Bool)
     bt, n
 end
 
-function sprofile_flat(doCframes::Bool)
+function sprofile_flat(io::Stream, doCframes::Bool)
     bt, n = sprof_flat(doCframes)
     p = sprof_sortorder(bt)
     n = n[p]
     bt = bt[p]
-    @printf("%6s %20s %30s %6s\n", "Count", "File", "Function", "Line")
+    @printf(io, "%6s %20s %30s %6s\n", "Count", "File", "Function", "Line")
     for i = 1:length(n)
-        @printf("%6d %20s %30s %6d\n", n[i], truncto(string(bt[i][2]), 20), truncto(string(bt[i][1]), 30), bt[i][3])
+        @printf(io, "%6d %20s %30s %6d\n", n[i], truncto(string(bt[i][2]), 20), truncto(string(bt[i][1]), 30), bt[i][3])
     end
 end
-sprofile_flat() = sprofile_flat(false)
+sprofile_flat(io::Stream) = sprofile_flat(io, false)
+sprofile_flat(doCframes::Bool) = sprofile_flat(OUTPUT_STREAM, doCframes)
+sprofile_flat() = sprofile_flat(OUTPUT_STREAM, false)
 
 ## A tree representation
 function sprof_tree()
@@ -194,7 +196,7 @@ function sprof_tree_format(infoa::Vector{Vector{Any}}, counts::Vector{Int}, leve
 end
 sprof_tree_format(infoa::Vector{Vector{Any}}, counts::Vector{Int}, level::Int) = sprof_tree_format(infoa, counts, level, tty_cols())
 
-function sprofile_tree(bt::Vector{Vector{Uint}}, counts::Vector{Int}, level::Int, doCframes::Bool)
+function sprofile_tree(io, bt::Vector{Vector{Uint}}, counts::Vector{Int}, level::Int, doCframes::Bool)
     umatched = falses(length(counts))
     len = Int[length(x) for x in bt]
     infoa = Array(Vector{Any}, 0)
@@ -218,24 +220,26 @@ function sprofile_tree(bt::Vector{Vector{Uint}}, counts::Vector{Int}, level::Int
     strs = sprof_tree_format(infoa, n, level)
     for i = 1:length(infoa)
         if !isempty(strs[i])
-            println(strs[i])
+            println(io, strs[i])
         end
         keep = keepa[i]
         if any(keep)
-            sprofile_tree(bt[keep], counts[keep], level+1, doCframes)
+            sprofile_tree(io, bt[keep], counts[keep], level+1, doCframes)
         end
     end
 #     print("\n")
 end
 
-function sprofile_tree(doCframes::Bool)
+function sprofile_tree(io::Stream, doCframes::Bool)
     bt, counts = sprof_tree()
     level = 0
     len = Int[length(x) for x in bt]
     keep = len .> 0
-    sprofile_tree(bt[keep], counts[keep], level, doCframes)
+    sprofile_tree(io, bt[keep], counts[keep], level, doCframes)
 end
-sprofile_tree() = sprofile_tree(false)
+sprofile_tree(io::Stream) = sprofile_tree(io, false)
+sprofile_tree(doCframes::Bool) = sprofile_tree(OUTPUT_STREAM, doCframes)
+sprofile_tree() = sprofile_tree(OUTPUT_STREAM, false)
 
 ## Use this to profile code
 macro sprofile(ex)
