@@ -18,12 +18,8 @@ The weakness of a sampling profiler is that these snapshots do not provide compl
 
 Within Julia, use the package manager:
 ```julia
-load("pkg.jl")
-Pkg.init()     # if you've never installed a package before
 Pkg.add("Profile")
 ```
-
-**You also need to compile a C library.** Within the `Profile/src` directory, type `include("postinstall.jl")` from the Julia prompt.
 
 ## Using the sampling profiler
 
