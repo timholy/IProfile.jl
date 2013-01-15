@@ -1,6 +1,6 @@
 # Build with something like:
 #   make INCPATH=~/src/julia/src
-# Calling require("postinstall.jl") from within Julia should handle
+# Calling require("build.jl") or Pkg.runbuildscript("Profile") from within Julia should handle
 # this for you.
 
 CC=gcc
@@ -9,19 +9,25 @@ CFLAGS=-Wall -I $(INCPATH)
 LDFLAGS=
 LINKLIBS=
 
-platform=$(shell uname -o)
-ifeq ($(platform),GNU/Linux)
+platform=$(shell uname)
+ifeq ($(platform),Linux)
 	LINKLIBS+=-lrt
-endif
-ifeq ($(platform),Darwin)
+	LIBEXT=so
+else ifeq ($(platform),Darwin)
 	LDFLAGS+=-Wl,-U,_rec_backtrace
+	LIBEXT=dylib
+else
+	# WINDOWS
+	# what are the appropriate LDFLAGS??
+	LDFLAGS+=-lrt
+	LIBEXT=dll
 endif
 
 profile: profile.c
-	$(CC) $(CFLAGS) -O2 -shared -fPIC profile.c $(LDFLAGS) $(LINKLIBS) -o libprofile.so
+	$(CC) $(CFLAGS) -O2 -shared -fPIC profile.c $(LDFLAGS) $(LINKLIBS) -o libprofile.$(LIBEXT)
 
 clean:
-	-rm libprofile.so
+	-rm libprofile.$(LIBEXT)
 
 .PHONY: \
 	profile
