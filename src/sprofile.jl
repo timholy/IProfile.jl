@@ -2,7 +2,7 @@ module SProfile
 
 ## Wrap the C library
 fnames = ["libprofile.so", "libprofile.dylib", "libprofile.dll"]
-paths = [pwd(), joinpath(julia_pkgdir(), "Profile", "src")]
+paths = [pwd(), joinpath(julia_pkgdir(), "Profile", "deps")]
 global libname
 found = false
 for path in paths
@@ -17,7 +17,7 @@ for path in paths
     end
 end
 if !isfile(libname)
-    error("Library cannot be found. Did you build it?\n  Try include(\"postinstall.jl\") from within the src directory.")
+    error("Library cannot be found; it may not have been built correctly.\n Try include(\"build.jl\") from within the deps directory.")
 end
 const libprofile = libname
 
