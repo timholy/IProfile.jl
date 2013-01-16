@@ -67,13 +67,22 @@ const delay = 1_000_000
 const nsamples = 1_000_000
 sprofile_init(delay, nsamples)
 
+# Number of backtrace "steps" that are triggered by taking the backtrace, e.g., inside profile_bt
+# May be platform-specific
+const btskip = 2
 
 ## A simple linecount parser
 function sprof_flat(doCframes::Bool)
     data = sprofile_get()
     linecount = (Uint=>Int)[]
+    toskip = btskip
     for i = 1:length(data)
+        if toskip > 0
+            toskip -= 1
+            continue
+        end
         if data[i] == 0
+            toskip = btskip
             continue
         end
         linecount[data[i]] = get(linecount, data[i], 0)+1
@@ -114,11 +123,11 @@ function sprof_tree()
     data = sprofile_get()
     iz = find(data .== 0)
     treecount = (Vector{Uint}=>Int)[]
-    istart = 1
+    istart = 1+btskip
     for iend in iz
         tmp = data[iend-1:-1:istart]
         treecount[tmp] = get(treecount, tmp, 0)+1
-        istart = iend+1
+        istart = iend+1+btskip
     end
     bt = Array(Vector{Uint}, 0)
     counts = Array(Int, 0)
