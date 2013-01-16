@@ -1,4 +1,6 @@
 module SProfile
+require("Options")
+using OptionsMod
 
 ## Wrap the C library
 fnames = ["libprofile.so", "libprofile.dylib", "libprofile.dll"]
@@ -104,19 +106,48 @@ function sprof_flat(doCframes::Bool)
     bt, n
 end
 
-function sprofile_flat(io::Stream, doCframes::Bool)
+function sprofile_flat(io::Stream, opts::Options)
+    @defaults opts doCframes=false mergelines=true
     bt, n = sprof_flat(doCframes)
     p = sprof_sortorder(bt)
     n = n[p]
     bt = bt[p]
-    @printf(io, "%6s %20s %30s %6s\n", "Count", "File", "Function", "Line")
-    for i = 1:length(n)
-        @printf(io, "%6d %20s %30s %6d\n", n[i], truncto(string(bt[i][2]), 20), truncto(string(bt[i][1]), 30), bt[i][3])
+    if mergelines
+        j = 1
+        for i = 2:length(bt)
+            if bt[i] == bt[j]
+                n[j] += n[i]
+                n[i] = 0
+            else
+                j = i
+            end
+        end
+        keep = n .> 0
+        n = n[keep]
+        bt = bt[keep]
     end
+    if doCframes
+        @printf(io, "%6s %20s %30s %12s\n", "Count", "File", "Function", "Line/offset")
+    else
+        @printf(io, "%6s %20s %30s %6s\n", "Count", "File", "Function", "Line")
+    end
+    for i = 1:length(n)
+        if doCframes
+            if isa(bt[i][3], Signed)
+                @printf(io, "%6d %20s %30s %12d\n", n[i], truncto(string(bt[i][2]), 20), truncto(string(bt[i][1]), 30), bt[i][3])
+            else
+                @printf(io, "%6d %20s %30s %12x\n", n[i], truncto(string(bt[i][2]), 20), truncto(string(bt[i][1]), 30), bt[i][3])
+            end
+        else
+            @printf(io, "%6d %20s %30s %6d\n", n[i], truncto(string(bt[i][2]), 20), truncto(string(bt[i][1]), 30), bt[i][3])
+        end
+    end
+    @check_used opts
 end
-sprofile_flat(io::Stream) = sprofile_flat(io, false)
-sprofile_flat(doCframes::Bool) = sprofile_flat(OUTPUT_STREAM, doCframes)
-sprofile_flat() = sprofile_flat(OUTPUT_STREAM, false)
+sprofile_flat(io::Stream) = sprofile_flat(io, Options())
+sprofile_flat(doCframes::Bool) = sprofile_flat(OUTPUT_STREAM, Options(:doCframes, doCframes))
+sprofile_flat(opts::Options) = sprofile_flat(OUTPUT_STREAM, opts)
+sprofile_flat() = sprofile_flat(OUTPUT_STREAM, Options())
 
 ## A tree representation
 function sprof_tree()
