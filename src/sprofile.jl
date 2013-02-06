@@ -314,8 +314,7 @@ function sprof_sortorder(bt::Vector{Vector{Any}})
             comb[i] = "zzz"
         end
     end
-    scomb, p = sortperm(comb)
-    p
+    p = sortperm(comb)
 end
 
 export @sprofile, sprofile_clear, sprofile_flat, sprofile_init, sprofile_tree
