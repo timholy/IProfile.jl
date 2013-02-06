@@ -214,9 +214,9 @@ function sprof_tree_format(infoa::Vector{Vector{Any}}, counts::Vector{Int}, leve
         if !isempty(info)
             base = " "^nindent
             if showextra
-                base = strcat(base, "+", nextra, " ")
+                base = string(base, "+", nextra, " ")
             end
-            base = strcat(base,
+            base = string(base,
                           rpad(string(counts[i]), ndigcounts, " "),
                           " ",
                           truncto(string(info[2]), widthfile),
@@ -224,9 +224,9 @@ function sprof_tree_format(infoa::Vector{Vector{Any}}, counts::Vector{Int}, leve
                           truncto(string(info[1]), widthfunc),
                           "; ")
             if isa(info[3], Signed)
-                strs[i] = strcat(base, "line: ", info[3])
+                strs[i] = string(base, "line: ", info[3])
             else
-                strs[i] = strcat(base, "offset: ", minbytes(info[3]))
+                strs[i] = string(base, "offset: ", minbytes(info[3]))
             end
         else
             strs[i] = ""
@@ -300,7 +300,7 @@ end
 function truncto(str::ASCIIString, w::Int)
     ret = str;
     if length(str) > w
-        ret = strcat("...", str[end-w+4:end])
+        ret = string("...", str[end-w+4:end])
     end
     ret
 end
