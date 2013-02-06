@@ -4,7 +4,7 @@ using OptionsMod
 
 ## Wrap the C library
 fnames = ["libprofile.so", "libprofile.dylib", "libprofile.dll"]
-paths = [pwd(), joinpath(julia_pkgdir(), "Profile", "deps")]
+paths = [pwd(), joinpath(Pkg.dir(), "Profile", "deps")]
 global libname
 found = false
 for path in paths
