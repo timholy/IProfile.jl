@@ -106,7 +106,7 @@ function sprof_flat(doCframes::Bool)
     bt, n
 end
 
-function sprofile_flat(io::Stream, opts::Options)
+function sprofile_flat(io::IO, opts::Options)
     @defaults opts doCframes=false mergelines=true
     bt, n = sprof_flat(doCframes)
     p = sprof_sortorder(bt)
@@ -144,7 +144,7 @@ function sprofile_flat(io::Stream, opts::Options)
     end
     @check_used opts
 end
-sprofile_flat(io::Stream) = sprofile_flat(io, Options())
+sprofile_flat(io::IO) = sprofile_flat(io, Options())
 sprofile_flat(doCframes::Bool) = sprofile_flat(OUTPUT_STREAM, Options(:doCframes, doCframes))
 sprofile_flat(opts::Options) = sprofile_flat(OUTPUT_STREAM, opts)
 sprofile_flat() = sprofile_flat(OUTPUT_STREAM, Options())
@@ -270,14 +270,14 @@ function sprofile_tree(io, bt::Vector{Vector{Uint}}, counts::Vector{Int}, level:
 #     print("\n")
 end
 
-function sprofile_tree(io::Stream, doCframes::Bool)
+function sprofile_tree(io::IO, doCframes::Bool)
     bt, counts = sprof_tree()
     level = 0
     len = Int[length(x) for x in bt]
     keep = len .> 0
     sprofile_tree(io, bt[keep], counts[keep], level, doCframes)
 end
-sprofile_tree(io::Stream) = sprofile_tree(io, false)
+sprofile_tree(io::IO) = sprofile_tree(io, false)
 sprofile_tree(doCframes::Bool) = sprofile_tree(OUTPUT_STREAM, doCframes)
 sprofile_tree() = sprofile_tree(OUTPUT_STREAM, false)
 
