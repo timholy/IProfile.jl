@@ -275,8 +275,8 @@ end
 compensated_time(t, c) = t >= c*PROFILE_CALIB ? t-c*PROFILE_CALIB : 0
 show_unquoted(linex::Expr) = show_linenumber(linex.args...)
 show_unquoted(lnn::LineNumberNode) = show_linenumber(lnn.line)
-show_linenumber(line)       = strcat("\t#  line ",line)
-show_linenumber(line, file) = strcat("\t#  ",file,", line ",line)
+show_linenumber(line)       = string("\t#  line ",line)
+show_linenumber(line, file) = string("\t#  ",file,", line ",line)
 
 function profile_print(tc)
     # Compute total elapsed time
