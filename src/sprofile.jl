@@ -23,8 +23,8 @@ if !isfile(libname)
 end
 const libprofile = libname
 
-function sprofile_init(delay::Integer, nsamples::Integer)
-    status = ccall((:sprofile_init, libprofile), Void, (Uint64, Uint), delay, nsamples)
+function sprofile_init(nsamples::Integer, delay::Integer)
+    status = ccall((:sprofile_init, libprofile), Void, (Uint64, Uint), nsamples, delay)
     if status == -1
         error("Could not allocate space for ", nsamples, " profiling samples")
     end
