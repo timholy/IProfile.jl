@@ -106,7 +106,7 @@ The sampling profiler just accumulates snapshots, and the analysis only happens 
 You can adjust the behavior by calling
 
 ```julia
-sprofile_init(delay, nsamples)
+sprofile_init(nsamples, delay)
 ```
 
 where both parameters are integers. `delay` is expressed in nanoseconds, and is the amount of time that Julia gets between snapshots to perform the requested computations. (A very long-running job might not need such frequent snapshots.) The larger `nsamples`, the more snapshots you can take, at the cost of larger memory requirements.

@@ -123,10 +123,10 @@ void sprofile_stop_timer(void)
 //
 // Utility functions
 //
-int sprofile_init(size_t maxsize, u_int64_t nsec)
+int sprofile_init(size_t maxsize, u_int64_t delay_nsec)
 {
     bt_size_max = maxsize;
-    nsecprof = nsec;
+    nsecprof = delay_nsec;
     if (bt_data_prof != NULL)
         free(bt_data_prof);
     bt_data_prof = (ptrint_t*) malloc(maxsize*sizeof(ptrint_t));

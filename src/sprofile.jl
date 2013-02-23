@@ -63,11 +63,11 @@ end
 
 
 ## Initialize the profile data structures
-# Have the timer fire every 1ms = 10^6ns
-const delay = 1_000_000
 # Use a max size of 1M profile samples
 const nsamples = 1_000_000
-sprofile_init(delay, nsamples)
+# Have the timer fire every 1ms = 10^6ns
+const delay = 1_000_000
+sprofile_init(nsamples, delay)
 
 # Number of backtrace "steps" that are triggered by taking the backtrace, e.g., inside profile_bt
 # May be platform-specific
