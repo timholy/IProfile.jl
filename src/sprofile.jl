@@ -1,6 +1,4 @@
 module SProfile
-require("Options")
-using OptionsMod
 
 ## Wrap the C library
 fnames = ["libprofile.so", "libprofile.dylib", "libprofile.dll"]
@@ -24,7 +22,7 @@ end
 const libprofile = libname
 
 function sprofile_init(nsamples::Integer, delay::Integer)
-    status = ccall((:sprofile_init, libprofile), Void, (Uint64, Uint), nsamples, delay)
+    status = ccall((:sprofile_init, libprofile), Cint, (Uint64, Uint), nsamples, delay)
     if status == -1
         error("Could not allocate space for ", nsamples, " profiling samples")
     end
@@ -43,9 +41,14 @@ sprofile_maxlen_data() = convert(Int, ccall((:sprofile_maxlen_data, libprofile),
 
 sprofile_clear() = ccall((:sprofile_clear_data, libprofile), Void, ())
 
-sprofile_parse(a::Vector{Uint}, doCframes::Bool) = ccall(:jl_parse_backtrace, Array{Any, 1}, (Ptr{Uint}, Uint, Int32), a, length(a), doCframes)
-
-sprofile_parse(u::Uint, doCframes::Bool) = sprofile_parse([u], doCframes)
+function sprofile_lookup(ip::Uint, doCframes::Bool)
+    info = ccall(:jl_lookup_code_address, Any, (Ptr{Void}, Bool), ip, doCframes)
+    if length(info) == 3
+        return string(info[1]), string(info[2]), info[3]
+    else
+        return info
+    end
+end
 
 sprofile_error_codes = (Int=>ASCIIString)[
     -1=>"Cannot specify signal action for profiling",
@@ -74,41 +77,45 @@ sprofile_init(nsamples, delay)
 const btskip = 2
 
 ## A simple linecount parser
-function sprof_flat(doCframes::Bool)
+function sprofile_parse_flat(doCframes::Bool)
     data = sprofile_get()
     linecount = (Uint=>Int)[]
     toskip = btskip
-    for i = 1:length(data)
+    for ip in data
         if toskip > 0
             toskip -= 1
             continue
         end
-        if data[i] == 0
+        if ip == 0
             toskip = btskip
             continue
         end
-        linecount[data[i]] = get(linecount, data[i], 0)+1
+        linecount[ip] = get(linecount, ip, 0)+1
     end
+    # Extract dict as arrays
     buf = Array(Uint, 0)
     n = Array(Int, 0)
     for (k,v) in linecount
         push!(buf, k)
         push!(n, v)
     end
-    bt = Array(Vector{Any}, length(buf))
+    # Convert instruction pointers to names & line numbers
+    bt = Array(Any, length(buf))
     for i = 1:length(buf)
-        bt[i] = sprofile_parse(buf[i], doCframes)
+        bt[i] = sprofile_lookup(buf[i], doCframes)
     end
     # Keep only the interpretable ones
-    keep = !Bool[isempty(x) for x in bt]
+    # The ones with no line number might appear multiple times in a single
+    # capture, giving the wrong impression about the total number of captures.
+    # Delete them too.
+    keep = !Bool[isempty(x) || x[3] == 0 for x in bt]
     n = n[keep]
     bt = bt[keep]
     bt, n
 end
 
-function sprofile_flat(io::IO, opts::Options)
-    @defaults opts doCframes=false mergelines=true
-    bt, n = sprof_flat(doCframes)
+function sprofile_flat(io::IO, doCframes::Bool, mergelines::Bool, cols::Int)
+    bt, n = sprofile_parse_flat(doCframes)
     p = sprof_sortorder(bt)
     n = n[p]
     bt = bt[p]
@@ -126,33 +133,40 @@ function sprofile_flat(io::IO, opts::Options)
         n = n[keep]
         bt = bt[keep]
     end
-    if doCframes
-        @printf(io, "%6s %20s %30s %12s\n", "Count", "File", "Function", "Line/offset")
+    wcounts = max(6, ndigits(max(n)))
+    maxline = 0
+    maxfile = 0
+    maxfun = 0
+    for thisbt in bt
+        maxline = max(maxline, thisbt[3])
+        maxfile = max(maxfile, length(thisbt[2]))
+        maxfun = max(maxfun, length(thisbt[1]))
+    end
+    wline = max(12, ndigits(maxline))
+    ntext = cols - wcounts - wline - 3
+    if maxfile+maxfun <= ntext
+        wfile = maxfile
+        wfun = maxfun
     else
-        @printf(io, "%6s %20s %30s %6s\n", "Count", "File", "Function", "Line")
+        wfile = ifloor(2*ntext/5)
+        wfun = ifloor(3*ntext/5)
     end
+    println(io, lpad("Count", wcounts, " "), " ", rpad("File", wfile, " "), " ", rpad("Function", wfun, " "), " ", lpad("Line/offset", wline, " "))
     for i = 1:length(n)
-        if doCframes
-            if isa(bt[i][3], Signed)
-                @printf(io, "%6d %20s %30s %12d\n", n[i], truncto(string(bt[i][2]), 20), truncto(string(bt[i][1]), 30), bt[i][3])
-            else
-                @printf(io, "%6d %20s %30s %12x\n", n[i], truncto(string(bt[i][2]), 20), truncto(string(bt[i][1]), 30), bt[i][3])
-            end
-        else
-            @printf(io, "%6d %20s %30s %6d\n", n[i], truncto(string(bt[i][2]), 20), truncto(string(bt[i][1]), 30), bt[i][3])
-        end
+        thisbt = bt[i]
+        println(io, lpad(string(n[i]), wcounts, " "), " ", rpad(truncto(thisbt[2], wfile), wfile, " "), " ", rpad(truncto(thisbt[1], wfun), wfun, " "), " ", lpad(string(thisbt[3]), wline, " "))
     end
-    @check_used opts
 end
-sprofile_flat(io::IO) = sprofile_flat(io, Options())
-sprofile_flat(doCframes::Bool) = sprofile_flat(OUTPUT_STREAM, Options(:doCframes, doCframes))
-sprofile_flat(opts::Options) = sprofile_flat(OUTPUT_STREAM, opts)
-sprofile_flat() = sprofile_flat(OUTPUT_STREAM, Options())
+sprofile_flat(io::IO) = sprofile_flat(io, false, true, tty_cols())
+sprofile_flat() = sprofile_flat(OUTPUT_STREAM)
+sprofile_flat(doCframes::Bool, mergelines::Bool) = sprofile_flat(OUTPUT_STREAM, doCframes,  mergelines, tty_cols())
+sprofile_flat(doCframes::Bool) = sprofile_flat(OUTPUT_STREAM, doCframes,  true, tty_cols())
 
 ## A tree representation
+# Identify and counts repetitions of all unique captures
 function sprof_tree()
     data = sprofile_get()
-    iz = find(data .== 0)
+    iz = find(data .== 0)  # find the breaks between captures
     treecount = (Vector{Uint}=>Int)[]
     istart = 1+btskip
     for iend in iz
@@ -169,33 +183,9 @@ function sprof_tree()
     bt, counts
 end
 
-function sprof_treematch(bt::Vector{Vector{Uint}}, counts::Vector{Int}, pattern::Vector{Uint})
-    l = length(pattern)
-    n = length(counts)
-    matched = falses(n)
-    for i = 1:n
-        k = bt[i]
-        if length(k) >= l && k[1:l] == pattern
-            matched[i] = true
-        end
-    end
-    matched
-end
+sprof_tree_format_linewidth(x) = isempty(x) ? 0 : ndigits(x[3])+6
 
-sprof_tree_format_linewidth(x::Vector{Any}) = isempty(x) ? 0 : ndigits(x[3])+(isa(x[3],Signed) ? 6 : 11)
-function minbytes(x::Uint)
-    if x <= typemax(Uint8)
-        return uint8(x)
-    elseif x <= typemax(Uint16)
-        return uint16(x)
-    elseif x <= typemax(Uint32)
-        return uint32(x)
-    else
-        return x
-    end
-end
-
-function sprof_tree_format(infoa::Vector{Vector{Any}}, counts::Vector{Int}, level::Int, cols::Integer)
+function sprof_tree_format(infoa::Vector{Any}, counts::Vector{Int}, level::Int, cols::Integer)
     nindent = min(ifloor(cols/2), level)
     ndigcounts = ndigits(max(counts))
     ndigline = max([sprof_tree_format_linewidth(x) for x in infoa])
@@ -223,63 +213,82 @@ function sprof_tree_format(infoa::Vector{Vector{Any}}, counts::Vector{Int}, leve
                           "; ",
                           truncto(string(info[1]), widthfunc),
                           "; ")
-            if isa(info[3], Signed)
-                strs[i] = string(base, "line: ", info[3])
-            else
-                strs[i] = string(base, "offset: ", minbytes(info[3]))
-            end
+            strs[i] = string(base, "line: ", info[3])
         else
             strs[i] = ""
         end
     end
     strs
 end
-sprof_tree_format(infoa::Vector{Vector{Any}}, counts::Vector{Int}, level::Int) = sprof_tree_format(infoa, counts, level, tty_cols())
+sprof_tree_format(infoa::Vector{Any}, counts::Vector{Int}, level::Int) = sprof_tree_format(infoa, counts, level, tty_cols())
 
-function sprofile_tree(io, bt::Vector{Vector{Uint}}, counts::Vector{Int}, level::Int, doCframes::Bool)
-    umatched = falses(length(counts))
-    len = Int[length(x) for x in bt]
-    infoa = Array(Vector{Any}, 0)
-    keepa = Array(BitArray, 0)
-    n = Array(Int, 0)
-    while !all(umatched)
-        ind = findfirst(!umatched)
-        pattern = bt[ind][1:level+1]
-        matched = sprof_treematch(bt, counts, pattern)
-        info = sprofile_parse(pattern[end], doCframes)
-        push!(infoa, info)
-        keep = matched & (len .> level+1)
-        push!(keepa, keep)
-        umatched |= matched
-        push!(n, sum(counts[matched]))
+# Print a "branch" starting at a particular level. This gets called recursively.
+function sprofile_tree(io, bt::Vector{Vector{Uint}}, counts::Vector{Int}, level::Int, doCframes::Bool, mergelines::Bool)
+    # Organize captures into groups that are identical up to this level
+    d = Dict{Any, Vector{Int}}()
+    local key
+    for i = 1:length(bt)
+        thisbt = bt[i][level+1]
+        if mergelines
+            key = sprofile_lookup(thisbt, doCframes)
+        else
+            key = thisbt
+        end
+        indx = Base.ht_keyindex(d, key)
+        if indx == -1
+            d[key] = [i]
+        else
+            push!(d.vals[indx], i)
+        end
     end
+    # Generate the counts and code lookups (if we don't already have them)
+    infoa = Array(Any, length(d))
+    group = Array(Vector{Int}, length(d))
+    n = Array(Int, length(d))
+    i = 1
+    for (k,v) in d
+        if mergelines
+            infoa[i] = k
+        else
+            infoa[i] = sprofile_lookup(k, doCframes)
+        end
+        group[i] = v
+        n[i] = sum(counts[v])
+        i += 1
+    end
+    # Order them
     p = sprof_sortorder(infoa)
     infoa = infoa[p]
-    keepa = keepa[p]
+    group = group[p]
     n = n[p]
+    # Generate the string for each line
     strs = sprof_tree_format(infoa, n, level)
+    # Recurse to the next level
+    len = Int[length(x) for x in bt]
     for i = 1:length(infoa)
         if !isempty(strs[i])
             println(io, strs[i])
         end
-        keep = keepa[i]
+        idx = group[i]
+        keep = len[idx] .> level+1
         if any(keep)
-            sprofile_tree(io, bt[keep], counts[keep], level+1, doCframes)
+            idx = idx[keep]
+            sprofile_tree(io, bt[idx], counts[idx], level+1, doCframes, mergelines)
         end
     end
-#     print("\n")
 end
 
-function sprofile_tree(io::IO, doCframes::Bool)
+function sprofile_tree(io::IO, doCframes::Bool, mergelines::Bool)
     bt, counts = sprof_tree()
     level = 0
     len = Int[length(x) for x in bt]
     keep = len .> 0
-    sprofile_tree(io, bt[keep], counts[keep], level, doCframes)
+    sprofile_tree(io, bt[keep], counts[keep], level, doCframes, mergelines)
 end
-sprofile_tree(io::IO) = sprofile_tree(io, false)
-sprofile_tree(doCframes::Bool) = sprofile_tree(OUTPUT_STREAM, doCframes)
-sprofile_tree() = sprofile_tree(OUTPUT_STREAM, false)
+sprofile_tree(io::IO) = sprofile_tree(io, false, true)
+sprofile_tree(doCframes::Bool, mergelines::Bool) = sprofile_tree(OUTPUT_STREAM, doCframes, mergelines)
+sprofile_tree(doCframes::Bool) = sprofile_tree(OUTPUT_STREAM, doCframes, true)
+sprofile_tree() = sprofile_tree(OUTPUT_STREAM)
 
 ## Use this to profile code
 macro sprofile(ex)
@@ -305,16 +314,18 @@ function truncto(str::ASCIIString, w::Int)
     ret
 end
 
-function sprof_sortorder(bt::Vector{Vector{Any}})
+# Order alphabetically (file, function) and then by line number
+function sprof_sortorder(bt::Vector{Any})
     comb = Array(ASCIIString, length(bt))
     for i = 1:length(bt)
-        if !isempty(bt[i])
-            comb[i] = @sprintf("%s:%s:%06d", bt[i][2], bt[i][1], bt[i][3])
+        thisbt = bt[i]
+        if !isempty(thisbt)
+            comb[i] = @sprintf("%s:%s:%06d", thisbt[2], thisbt[1], thisbt[3])
         else
             comb[i] = "zzz"
         end
     end
-    p = sortperm(comb)
+    sortperm(comb)
 end
 
 export @sprofile, sprofile_clear, sprofile_flat, sprofile_init, sprofile_tree
