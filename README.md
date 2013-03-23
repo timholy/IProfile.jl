@@ -1,18 +1,32 @@
 # Profile.jl
 
-This package contains profiling tools for the [Julia][Julia] language. Profilers are mainly used for code optimization, particularly to find bottlenecks.
+This package contains profiling tools for the [Julia][Julia] language. Profilers
+are mainly used for code optimization, particularly to find bottlenecks.
 
-This package implements two [types of profilers][wp], an "instrumenting" profiler and a "sampling" (statistical) profiler.
+This package implements two [types of profilers][wp], an "instrumenting"
+profiler and a "sampling" (statistical) profiler.
 
 ### Instrumenting profiler
 
-The instrumenting profiler provides detailed information, including the number of times each line gets executed and the total run time spent on that line. However, the instrumenting profiler requires that your code be (automatically) modified, by encapsulating it in "@iprofile begin...end". It also has a significant performance cost.
+The instrumenting profiler provides detailed information, including the number
+of times each line gets executed and the total run time spent on that line.
+However, the instrumenting profiler requires that your code be (automatically)
+modified, by encapsulating it in "@iprofile begin...end". It also has a
+significant performance cost.
 
 ### Sampling profiler
 
-The sampling profiler works by grabbing "snapshots" during the execution of any task. Each "snapshot" extracts the currently-running function and line number. When a line occurs frequently in the set of snapshots, one might suspect that this line consumes significant resources.
+The sampling profiler works by grabbing "snapshots" during the execution of any
+task. Each "snapshot" extracts the currently-running function and line number.
+When a line occurs frequently in the set of snapshots, one might suspect that
+this line consumes significant resources.
 
-The weakness of a sampling profiler is that these snapshots do not provide complete line-by-line coverage, because they occur at intervals (by default, 1 ms). However, the sampling profiler also has strengths. First, it requires no code modifications. As an important consequence, it can profile into Julia's core code and even (optionally) into C libraries. Second, by running "infrequently" there is very little performance overhead.
+The weakness of a sampling profiler is that these snapshots do not provide
+complete line-by-line coverage, because they occur at intervals (by default, 1
+ms). However, the sampling profiler also has strengths. First, it requires no
+code modifications. As an important consequence, it can profile into Julia's
+core code and even (optionally) into C libraries. Second, by running
+"infrequently" there is very little performance overhead.
 
 ## Installation
 
@@ -23,7 +37,8 @@ Pkg.add("Profile")
 
 ## Using the sampling profiler
 
-Unless you want to see Julia's compiler in action, it's a good idea to first run the code you intend to profile at least once. Here's a demo:
+Unless you want to see Julia's compiler in action, it's a good idea to first run
+the code you intend to profile at least once. Here's a demo:
 
 ```julia
 require("Profile")
@@ -39,69 +54,118 @@ myfunc()  # run once to force compilation
 To get the results, we do this:
 ```
 julia> sprofile_tree(true)
- 12 ...6_64-linux-gnu/libc.so.6; __libc_start_main; offset: 0xed
-   12 ...lib/libjulia-release.so; julia_trampoline; offset: 0x60
-       12 client.jl; _start; line: 318
-        12 client.jl; run_repl; line: 155
-           12 client.jl; eval_user_input; line: 82
-              12 no file; anonymous; line: 248
-                 8 none; myfunc; line: 2
-                  8 librandom.jl; dsfmt_gv_fill_array_close_open!; line: 128
-                   1 .../lib/librandom.so; dsfmt_fill_array_close_open; offset: 0x0166
-                   7 .../lib/librandom.so; dsfmt_fill_array_close_open; offset: 0x017f
-                 4 none; myfunc; line: 3
-                  1 array.jl; sum; line: 1385
-                  2 array.jl; sum; line: 1386
-                  1 array.jl; sum; line: 1386
+14 julia; ???; line: 0
+ 14 /lib/x86_64-linux-gnu/libc.so.6; __libc_start_main; line: 237
+  14 julia; ???; line: 0
+   14 /home/tim/src/julia/usr/bin/../lib/libjulia-release.so; julia_trampoline; line: 131
+    14 julia; ???; line: 0
+     14 /home/tim/src/julia/usr/bin/../lib/libjulia-release.so; ???; line: 0
+      14 ???; ???; line: 0
+       14 client.jl; _start; line: 344
+        14 client.jl; run_repl; line: 141
+         14 /home/tim/src/julia/usr/bin/../lib/libjulia-release.so; ???; line: 0
+          14 ???; ???; line: 0
+           14 client.jl; eval_user_input; line: 68
+            14 /home/tim/src/julia/usr/bin/../lib/libjulia-release.so; ???; line: 0
+             14 /home/tim/src/julia/usr/bin/../lib/libjulia-release.so; ???; line: 0
+              14 /home/tim/src/julia-modules/Profile.jl/src/sprofile.jl; anonymous; line: 301
+               14 /home/tim/src/julia/usr/bin/../lib/libjulia-release.so; ???; line: 0
+                14 ???; ???; line: 0
+                 11 none; myfunc; line: 2
+                  11 librandom.jl; dsfmt_gv_fill_array_close_open!; line: 128
+                   1 /home/tim/src/julia/usr/bin/../lib/librandom.so; dsfmt_fill_array_close_open; line: 375
+                   9 /home/tim/src/julia/usr/bin/../lib/librandom.so; dsfmt_fill_array_close_open; line: 383
+                   1 /home/tim/src/julia/usr/bin/../lib/librandom.so; dsfmt_fill_array_close_open; line: 391
+                 3  none; myfunc; line: 3
+                  3 abstractarray.jl; sum; line: 1266
 ```
-The `true` as an argument causes it to include C functions in the results; if you simply call `sprofile_tree()`, or `sprofile_tree(false)`, it will exclude C functions.
+The `true` as an argument causes it to include C functions in the results; if
+you simply call `sprofile_tree()`, or `sprofile_tree(false)`, it will exclude C
+functions.
 
-Here's how to interpret these results: the first "field" indicates the number of samples taken, the second the filename followed by a semicolon, the third the function name followed by a semicolon, and the fourth the line number (or, for C code, the instruction offset in hex). Long paths and function names are truncated at their beginning, showing "...", and the display is set to fit inside the width of your terminal (so your results may look slightly different). Each sub-function call indents an additional space. There are some situations in which the backtrace line cannot be not resolved to a function name, and these lines are not shown; however, their existence in the nesting hierarchy can be inferred from an increase in the indentation by more than one space. In some cases, you may see things like "+n" (where n is a number) prepended to one or more lines; that's an indication that it should have indented another n spaces, but ran out of room. 
+Here's how to interpret these results: the first "field" indicates the number of
+samples taken, the second the filename followed by a semicolon, the third the
+function name followed by a semicolon, and the fourth the line number (or, for C
+code, the instruction offset). Long paths and function names are
+truncated at their beginning, showing "...", and the display is set to fit
+inside the width of your terminal (so your results may look slightly different).
+Each sub-function call indents an additional space. There are some situations in
+which the backtrace line cannot be not resolved to a function name, and these
+lines are shown with `???`. In some
+cases, you may see things like "+n" (where n is a number) prepended to one or
+more lines; that's an indication that it should have indented another n spaces,
+but ran out of room. 
 
-In this specific case, there were 12 "samples" taken during the running of `myfunc`. The top level was in the system's `libc`, in `__libc_start_main`, which then calls `julia_trampoline`, which in turn calls our first Julia function, `_start`, in `client.jl`. Progressing a little further, `eval_user_input` is the function that gets evaluated each time you type something on the REPL, so this is essentially the "parent" of all activity that you initiate from the REPL. Each one of these shows 12 samples, meaning that each snapshot captured a state "inside" these functions.
+In this specific case, there were 14 "samples" taken during the running of
+`myfunc`. The top levels are `julia` itself, the system's `libc` in `__libc_start_main`,
+a call to `julia_trampoline`, and eventually our first Julia
+function, `_start`, in `client.jl`. Progressing a little further,
+`eval_user_input` is the function that gets evaluated each time you type
+something on the REPL, so this is essentially the "parent" of all activity that
+you initiate from the REPL. Each one of these shows 14 samples, meaning that
+each snapshot captured a state "inside" these functions.
 
 The first "interesting" part is the line
 
 ```
-8 none; myfunc; line: 2
+11 none; myfunc; line: 2
 ```
-`none` refers to the fact that we typed `myfunc` in at the REPL, rather than putting it in a file. Line 2 contains the call to `rand`, and there were 8 (out of 12) snapshots taken here. Below that, you can see a call to `dsfmt_gv_fill_array_close_open!` inside `librandom.jl` and finally down again into a C library. You might be surprised not to see the `rand` function listed explicitly: that's because `rand` is _inlined_, and hence doesn't appear in the backtraces.
+`none` refers to the fact that we typed `myfunc` in at the REPL, rather than
+putting it in a file. Line 2 contains the call to `rand`, and there were 11 (out
+of 14) snapshots taken here. Below that, you can see a call to
+`dsfmt_gv_fill_array_close_open!` inside `librandom.jl` and finally down again
+into a C library. You might be surprised not to see the `rand` function listed
+explicitly: that's because `rand` is _inlined_, and hence doesn't appear in the
+backtraces.
 
 A little further down, you see
 ```
-4 none; myfunc; line: 3
+3 none; myfunc; line: 3
 ```
-Line 3 of `myfunc` contains the call to `sum`, and there were 4 (out of 12) snapshots taken here. Below that, you can see the specific places in `base/array.jl` that implement the `sum` function for these inputs. Note that there are two listings for line 1386; the code on this line is
-```julia
-        v += A[i]
-```
-and therefore contains multiple operations, the "reference" `A[i]` and the summation. Both of these operations are generated directly by the compiler and do not require any function calls, so they are at the lowest level of the backtrace. But because they are separate operations, they get two listings. This can be useful in spotting cases where multiple operations on the same line require vastly different execution times.
+Line 3 of `myfunc` contains the call to `sum`, and there were 3 (out of 14)
+samples taken here. Below that, you can see the specific place in
+`base/abstractarray.jl` that implements the `sum` function for these inputs.
 
-Overall, we can tentatively conclude that random number generation is something like twice as expensive as the sum operation. To get better statistics, we'd want to run this multiple times.
+Some lines contain multiple operations, and in fact the backtraces can
+distinguish between these operations. By default, however, the counts are
+"collapsed." By saying `sprofile_tree(true, false)` you can see separate
+counts for each operation. The second argument determines whether the multiple
+operations are merged into a single line.
+
+Overall, we can tentatively conclude that random number generation is several
+times as expensive as the sum operation. To get better statistics, we'd want to
+run this multiple times.
 
 An alternative way of viewing the results is as a "flat" dump:
 ```julia
 julia> sprofile_flat(true)
- Count                 File                       Function   Line
-    12 ...bjulia-release.so               julia_trampoline     96
-     1 .../lib/librandom.so    dsfmt_fill_array_close_open    358
-     7 .../lib/librandom.so    dsfmt_fill_array_close_open    383
-    12 ...nux-gnu/libc.so.6              __libc_start_main    237
-     1             array.jl                            sum   1385
-     2             array.jl                            sum   1386
-     1             array.jl                            sum   1386
-    12            client.jl                         _start    318
-    12            client.jl                eval_user_input     82
-    12            client.jl                       run_repl    155
-     8         librandom.jl ...t_gv_fill_array_close_open!    128
-    12              no file                      anonymous    248
-     8                 none                         myfunc      2
-     4                 none                         myfunc      3
+ Count File                                                   Function                         Line/offset
+    14 /home/tim/src/julia-modules/Profile.jl/src/sprofile.jl anonymous                                301
+    14 /home/tim/src/julia/usr/bin/../lib/libjulia-release.so julia_trampoline                         131
+     1 /home/tim/src/julia/usr/bin/../lib/librandom.so        dsfmt_fill_array_close_open              375
+     9 /home/tim/src/julia/usr/bin/../lib/librandom.so        dsfmt_fill_array_close_open              383
+     1 /home/tim/src/julia/usr/bin/../lib/librandom.so        dsfmt_fill_array_close_open              391
+    14 /lib/x86_64-linux-gnu/libc.so.6                        __libc_start_main                        237
+     3 abstractarray.jl                                       sum                                     1266
+    14 client.jl                                              _start                                   344
+    14 client.jl                                              eval_user_input                           68
+    14 client.jl                                              run_repl                                 141
+    11 librandom.jl                                           dsfmt_gv_fill_array_close_open!          128
+    11 none                                                   myfunc                                     2
+     3 none                                                   myfunc                                     3
 ```
+The same flags apply for `sprofile_flat` as for `sprofile_tree`.
 
-You can accumulate the results of multiple calls, and view the combined results with these functions. If you want to start from scratch, use `sprofile_clear()`. 
+You can accumulate the results of multiple calls, and view the combined results
+with these functions. If you want to start from scratch, use
+`sprofile_clear()`. 
 
-The sampling profiler just accumulates snapshots, and the analysis only happens when you ask for the report with `sprofile_tree` or `sprofile_flat`. For a long-running computation, it's entirely possible that the pre-allocated buffer for storing snapshots will be filled. If that happens, the snapshots stop, but your computation continues. As a consequence, you may miss some important profiling data, although you will get a warning when that happens.
+The sampling profiler just accumulates snapshots, and the analysis only happens
+when you ask for the report with `sprofile_tree` or `sprofile_flat`. For a
+long-running computation, it's entirely possible that the pre-allocated buffer
+for storing snapshots will be filled. If that happens, the snapshots stop, but
+your computation continues. As a consequence, you may miss some important
+profiling data, although you will get a warning when that happens.
 
 You can adjust the behavior by calling
 
@@ -109,7 +173,11 @@ You can adjust the behavior by calling
 sprofile_init(nsamples, delay)
 ```
 
-where both parameters are integers. `delay` is expressed in nanoseconds, and is the amount of time that Julia gets between snapshots to perform the requested computations. (A very long-running job might not need such frequent snapshots.) The larger `nsamples`, the more snapshots you can take, at the cost of larger memory requirements.
+where both parameters are integers. `delay` is expressed in nanoseconds, and is
+the amount of time that Julia gets between snapshots to perform the requested
+computations. (A very long-running job might not need such frequent snapshots.)
+The larger `nsamples`, the more snapshots you can take, at the cost of larger
+memory requirements.
 
 
 ## Using the instrumenting profiler
