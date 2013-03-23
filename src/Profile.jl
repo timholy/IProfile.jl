@@ -1,3 +1,2 @@
-path = joinpath("Profile", "src")
-require(joinpath(path, "sprofile.jl"))
-require(joinpath(path, "iprofile.jl"))
+include("sprofile.jl")
+include("iprofile.jl")
