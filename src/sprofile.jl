@@ -114,7 +114,7 @@ function sprofile_parse_flat(doCframes::Bool)
     bt, n
 end
 
-function sprofile_flat(io::IO, doCframes::Bool, mergelines::Bool, cols::Int)
+function sprofile_flat(io::IO, doCframes::Bool, mergelines::Bool, cols::Integer)
     bt, n = sprofile_parse_flat(doCframes)
     p = sprof_sortorder(bt)
     n = n[p]
