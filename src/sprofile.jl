@@ -116,6 +116,10 @@ end
 
 function sprofile_flat(io::IO, doCframes::Bool, mergelines::Bool, cols::Integer)
     bt, n = sprofile_parse_flat(doCframes)
+    if isempty(n)
+        warning_empty()
+        return
+    end
     p = sprof_sortorder(bt)
     n = n[p]
     bt = bt[p]
@@ -280,6 +284,10 @@ end
 
 function sprofile_tree(io::IO, doCframes::Bool, mergelines::Bool)
     bt, counts = sprof_tree()
+    if isempty(counts)
+        warning_empty()
+        return
+    end
     level = 0
     len = Int[length(x) for x in bt]
     keep = len .> 0
@@ -327,6 +335,12 @@ function sprof_sortorder(bt::Vector{Any})
     end
     sortperm(comb)
 end
+
+warning_empty() = warn("""
+            There were no samples collected. Run your program longer (perhaps by
+            running it multiple times), or adjust the delay between samples with
+            sprofile_init().""")
+
 
 export @sprofile, sprofile_clear, sprofile_flat, sprofile_init, sprofile_tree
 
