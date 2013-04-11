@@ -125,7 +125,7 @@ function insert_profile_block(fblock::Expr, tlast, tnow, timers, counters, tags,
             end
         end
     end
-    return expr(:block, fblocknewargs), indx
+    return Expr(:block, fblocknewargs...), indx
 end
 
 # Handling control-flow statements
@@ -134,12 +134,12 @@ function insert_profile_cf(ex::Expr, tlast, tnow, timers, counters, tags, indx::
     if length(ex.args) == 2
         # This is a for, while, or 2-argument if or try block
         block1, indx = insert_profile(ex.args[2], tlast, tnow, timers, counters, tags, indx, retsym, rettest)
-        return expr(ex.head, {ex.args[1], block1}), indx
+        return Expr(ex.head, {ex.args[1], block1}...), indx
     elseif length(ex.args) == 3
         # This is for a 3-argument if or try block
         block1, indx = insert_profile(ex.args[2], tlast, tnow, timers, counters, tags, indx, retsym, rettest)
         block2, indx = insert_profile(ex.args[3], tlast, tnow, timers, counters, tags, indx, retsym, rettest)
-        return expr(ex.head, {ex.args[1], block1, block2}), indx
+        return Expr(ex.head, {ex.args[1], block1, block2}...), indx
     else
         error("Wrong number of arguments")
     end
@@ -178,7 +178,7 @@ function insert_profile_function(ex::Expr, tlast, tnow, timers, counters, tags, 
     fblocknewargs, indx = insert_profile_block(fblock, tlast, tnow, timers, counters, tags, indx, retsym, savefunc)
     # Prepend the initialization of tlast
     fblocknewargs = vcat({:($tlast = time_ns())}, fblocknewargs.args)
-    return expr(:function,{funcsyntax(ex),expr(:block,fblocknewargs)}), indx
+    return Expr(:function,{funcsyntax(ex),Expr(:block,fblocknewargs...)}...), indx
 end
 
 function profile_parse(ex::Expr)
@@ -204,7 +204,7 @@ function profile_parse(ex::Expr)
             for i = 1:length(ex.args)
                 if isfuncexpr(ex.args[i])
                     # Insert "global" statement for each function
-                    push!(coreargs,expr(:global,funcsym(ex.args[i])))
+                    push!(coreargs,Expr(:global,funcsym(ex.args[i])))
                     # Insert function-call counters
                     newfuncexpr, indx = insert_profile_function(ex.args[i], tlast, tnow, timers, counters, tags, indx, retsym)
                     push!(coreargs, newfuncexpr)
@@ -214,7 +214,7 @@ function profile_parse(ex::Expr)
             end
         elseif isfuncexpr(ex)
             # This is a single function declaration
-            push!(coreargs,expr(:global,funcsym(ex)))
+            push!(coreargs,Expr(:global,funcsym(ex)))
             newfuncexpr, indx = insert_profile_function(ex, tlast, tnow, timers, counters, tags, indx, retsym)
             push!(coreargs, newfuncexpr)
         else
@@ -224,16 +224,16 @@ function profile_parse(ex::Expr)
         # Insert reporting function
         # Because we're using a gensym for the function name, we can't
         # quote the whole thing
-        push!(coreargs, expr(:global, funcreport))
-        push!(coreargs, expr(:function, {expr(:call, {funcreport}), expr(:block,{:(return $timers, $counters)})}))
+        push!(coreargs, Expr(:global, funcreport))
+        push!(coreargs, Expr(:function, {Expr(:call, {funcreport}...), Expr(:block,{:(return $timers, $counters)}...)}...))
         # Insert clearing function
-        push!(coreargs, expr(:global, funcclear))
-        push!(coreargs, expr(:function, {expr(:call, {funcclear}), expr(:block,{:(fill!($timers,0)), :(fill!($counters,0))})}))
+        push!(coreargs, Expr(:global, funcclear))
+        push!(coreargs, Expr(:function, {Expr(:call, {funcclear}...), Expr(:block,{:(fill!($timers,0)), :(fill!($counters,0))}...)}...))
         # Put all this inside a let block
-        excore = expr(:block,coreargs)
-        exlet = expr(:let,{expr(:block,excore), :($timers = zeros(Uint64, $n_lines)), :($counters = zeros(Uint64, $n_lines))})
+        excore = Expr(:block,coreargs...)
+        exlet = Expr(:let,{Expr(:block,excore), :($timers = zeros(Uint64, $n_lines)), :($counters = zeros(Uint64, $n_lines))}...)
         # Export the reporting and clearing functions, in case we're inside a module
-        exret = expr(:toplevel, {esc(exlet), expr(:export, {esc(funcclear), esc(funcreport)})})
+        exret = Expr(:toplevel, {esc(exlet), Expr(:export, {esc(funcclear), esc(funcreport)}...)}...)
         return exret, tags, funcreport, funcclear
     else
         return ex ,{}, :funcnoop, :funcnoop
@@ -258,7 +258,7 @@ function profile_parse_all()
         end
     end
     push!(retargs,:(return nothing))
-    return esc(expr(:block,retargs))
+    return esc(Expr(:block,retargs...))
 end
 
 function profile_report()
@@ -266,10 +266,10 @@ function profile_report()
     ret = gensym()
     exret[1] = :($ret = {})
     for i = 1:length(PROFILE_REPORTS)
-        exret[i+1] = :(push!($ret,$(expr(:call,{PROFILE_REPORTS[i]}))))
+        exret[i+1] = :(push!($ret,$(Expr(:call,{PROFILE_REPORTS[i]}...))))
     end
     exret[end] = :(profile_print($ret))
-    return expr(:block,exret)
+    return Expr(:block,exret...)
 end
 
 compensated_time(t, c) = t >= c*PROFILE_CALIB ? t-c*PROFILE_CALIB : 0
@@ -309,10 +309,10 @@ end
 function profile_clear()
     exret = cell(length(PROFILE_CLEARS)+1)
     for i = 1:length(PROFILE_CLEARS)
-        exret[i] = expr(:call,{PROFILE_CLEARS[i]})
+        exret[i] = Expr(:call,{PROFILE_CLEARS[i]}...)
     end
     exret[end] = :(return nothing)
-    return expr(:block,exret)
+    return Expr(:block,exret...)
 end
 
 macro iprofile(ex)
