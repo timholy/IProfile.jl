@@ -42,7 +42,7 @@ function isfuncexpr(ex::LineNumberNode)
     return false
 end
 function isfuncexpr(ex::Expr)
-    return ex.head == :function || (ex.head == :(=) && ex.args[1].head == :call)
+    return ex.head == :function || (ex.head == :(=) && typeof(ex.args[1]) == Expr && ex.args[1].head == :call)
 end
 
 # Get the "full syntax" of the function call

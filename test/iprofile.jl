@@ -22,6 +22,8 @@ end
 function f1{T}(x::T)
     return x+5
 end
+
+unused_top_level_var = 2
 end #@iprofile begin
 
 f1(7)
