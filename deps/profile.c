@@ -1,5 +1,8 @@
-#include "support/dtypes.h"
 #include <stdlib.h>
+#include <stddef.h>
+
+// Don't need to ask support/btypes.h about this, we can define it ourselves
+typedef ptrdiff_t ptrint_t;
 
 extern size_t rec_backtrace(ptrint_t *bt_data, size_t maxsize);
 
