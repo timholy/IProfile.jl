@@ -16,10 +16,10 @@ significant performance cost.
 
 ### Sampling profiler
 
-The sampling profiler works by grabbing "snapshots" during the execution of any
-task. Each "snapshot" extracts the currently-running function and line number.
-When a line occurs frequently in the set of snapshots, one might suspect that
-this line consumes significant resources.
+The sampling profiler works by periodically taking a backtrace during the execution of any
+task. Each backtrace captures the the currently-running function and line number, plus the complete chain of function calls that led to this line, and hence is a "snapshot" of the current state of execution.
+If you find that a particular line appears frequently in the set of backtraces, you might suspect that
+much of the run-time is spent on this line (and therefore is a bottleneck in your code).
 
 The weakness of a sampling profiler is that these snapshots do not provide
 complete line-by-line coverage, because they occur at intervals (by default, 1
@@ -41,8 +41,8 @@ Unless you want to see Julia's compiler in action, it's a good idea to first run
 the code you intend to profile at least once. Here's a demo:
 
 ```julia
-require("Profile")
-using SProfile  # use the sampling profiler
+using Profile
+
 function myfunc()
     A = rand(100, 100, 200)
     sum(A)
@@ -184,8 +184,7 @@ memory requirements.
 
 This starts similarly:
 ```julia
-require("Profile")
-using IProfile  # use the instrumenting profiler
+using Profile
 ```
 
 Here you encapsulate your code in a macro call:
