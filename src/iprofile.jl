@@ -75,6 +75,9 @@ function insert_profile(ex::Expr, tlast, tnow, timers, counters, tags, indx::Int
     end
 end
 
+# A variant for anything but an expression (a no-op).
+insert_profile(notex, tlast, tnow, timers, counters, tags, indx::Int, retsym, rettest) = notex, indx
+
 # Insert profiling statements into a code block
 # rettest is a function with the following syntax:
 #    rettest(Expr, Int)
