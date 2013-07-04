@@ -162,9 +162,9 @@ function sprofile_flat(io::IO, doCframes::Bool, mergelines::Bool, cols::Integer)
     end
 end
 sprofile_flat(io::IO) = sprofile_flat(io, false, true, tty_cols())
-sprofile_flat() = sprofile_flat(OUTPUT_STREAM)
-sprofile_flat(doCframes::Bool, mergelines::Bool) = sprofile_flat(OUTPUT_STREAM, doCframes,  mergelines, tty_cols())
-sprofile_flat(doCframes::Bool) = sprofile_flat(OUTPUT_STREAM, doCframes,  true, tty_cols())
+sprofile_flat() = sprofile_flat(STDOUT)
+sprofile_flat(doCframes::Bool, mergelines::Bool) = sprofile_flat(STDOUT, doCframes,  mergelines, tty_cols())
+sprofile_flat(doCframes::Bool) = sprofile_flat(STDOUT, doCframes,  true, tty_cols())
 
 ## A tree representation
 # Identify and counts repetitions of all unique captures
@@ -294,9 +294,9 @@ function sprofile_tree(io::IO, doCframes::Bool, mergelines::Bool)
     sprofile_tree(io, bt[keep], counts[keep], level, doCframes, mergelines)
 end
 sprofile_tree(io::IO) = sprofile_tree(io, false, true)
-sprofile_tree(doCframes::Bool, mergelines::Bool) = sprofile_tree(OUTPUT_STREAM, doCframes, mergelines)
-sprofile_tree(doCframes::Bool) = sprofile_tree(OUTPUT_STREAM, doCframes, true)
-sprofile_tree() = sprofile_tree(OUTPUT_STREAM)
+sprofile_tree(doCframes::Bool, mergelines::Bool) = sprofile_tree(STDOUT, doCframes, mergelines)
+sprofile_tree(doCframes::Bool) = sprofile_tree(STDOUT, doCframes, true)
+sprofile_tree() = sprofile_tree(STDOUT)
 
 ## Use this to profile code
 macro sprofile(ex)
