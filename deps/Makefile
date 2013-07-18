@@ -1,8 +1,3 @@
-# Build with something like:
-#   make INCPATH=~/src/julia/src
-# Calling require("build.jl") or Pkg.runbuildscript("Profile") from within Julia should handle
-# this for you.
-
 CC=gcc
 JULIALIBS=
 CFLAGS=-Wall
