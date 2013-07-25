@@ -136,8 +136,9 @@ Overall, we can tentatively conclude that random number generation is several
 times as expensive as the sum operation. To get better statistics, we'd want to
 run this multiple times.
 
-An alternative way of viewing the results is as a "flat" dump:
-```julia
+An alternative way of viewing the results is as a "flat" dump, which
+accumulates counts independent of their nesting:
+ ```julia
 julia> sprofile_flat(true)
  Count File                                                   Function                         Line/offset
     14 /home/tim/src/julia-modules/Profile.jl/src/sprofile.jl anonymous                                301
@@ -156,9 +157,23 @@ julia> sprofile_flat(true)
 ```
 The same flags apply for `sprofile_flat` as for `sprofile_tree`.
 
-You can accumulate the results of multiple calls, and view the combined results
-with these functions. If you want to start from scratch, use
-`sprofile_clear()`. 
+If your code has recursion, note that a line in a "child" function can
+accumulate more counts than there are total backtraces. Consider the
+following definitions:
+```julia
+dumbsum3() = dumbsum(3)
+dumbsum(n::Integer) = n == 1 ? 1 : 1 + dumbsum(n-1)
+```
+Now execute `dumbsum3()`, and imagine that a backtrace is triggered
+while executing `dumbsum(1)`. The backtrace looks like this:
+```julia
+dumbsum3
+    dumbsum(3)
+        dumbsum(2)
+            dumbsum(1)
+```
+so the single line of this child function gets 3 counts, even though
+the parent only gets one.
 
 The sampling profiler just accumulates snapshots, and the analysis only happens
 when you ask for the report with `sprofile_tree` or `sprofile_flat`. For a
@@ -179,6 +194,9 @@ computations. (A very long-running job might not need such frequent snapshots.)
 The larger `nsamples`, the more snapshots you can take, at the cost of larger
 memory requirements.
 
+Finally, note that you can accumulate the results of multiple calls,
+and view the combined results with these functions. If you want to
+start from scratch, use `sprofile_clear()`.
 
 ## Using the instrumenting profiler
 
