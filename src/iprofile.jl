@@ -1,7 +1,5 @@
 module IProfile
 
-gc_bytes() = ccall(:jl_gc_total_bytes, Csize_t, ())
-
 PROFILE_LINES = 1
 PROFILE_DESCEND = 2
 PROFILE_STATE = PROFILE_LINES | PROFILE_DESCEND    # state is a bitfield
@@ -26,9 +24,9 @@ function profile_calib(n_iter)
     trec = Array(Uint64, n_iter)
     for i = 1:n_iter
         tlast = time_ns()
-        blast = gc_bytes()
+        blast = Base.gc_bytes()
         tnow = time_ns()
-        bnow = gc_bytes()
+        bnow = Base.gc_bytes()
         trec[i] = tnow - tlast
     end
     return trec
@@ -126,7 +124,7 @@ function insert_profile_block(fblock::Expr, tlast, tnow, timers, blast, bnow, by
             #   timers[indx] += timehr_diff(tlast, tnow)
             #   counters[indx] += 1
             #   timehr(PROFILE_USE_CLOCK, tlast) # start time for next
-            append!(fblocknewargs,{:($tnow = time_ns()), :($bnow = gc_bytes()), :(($timers)[($indx)] += $tnow - $tlast),  :(($byters)[($indx)] += $bnow - $blast), :(($counters)[($indx)] += 1), :($tlast = time_ns()), :($blast = gc_bytes())})
+            append!(fblocknewargs,{:($tnow = time_ns()), :($bnow = Base.gc_bytes()), :(($timers)[($indx)] += $tnow - $tlast),  :(($byters)[($indx)] += $bnow - $blast), :(($counters)[($indx)] += 1), :($tlast = time_ns()), :($blast = Base.gc_bytes())})
             indx += 1
             if saveret
                 push!(fblocknewargs, :(return $retsym))
@@ -185,7 +183,7 @@ function insert_profile_function(ex::Expr, tlast, tnow, timers, blast, bnow, byt
     # Insert the profiling statements in the function
     fblocknewargs, indx = insert_profile_block(fblock, tlast, tnow, timers, blast, bnow, byters, counters, tags, indx, retsym, savefunc)
     # Prepend the initialization of tlast
-    fblocknewargs = vcat({:($tlast = time_ns())}, {:($blast = gc_bytes())}, fblocknewargs.args)
+    fblocknewargs = vcat({:($tlast = time_ns())}, {:($blast = Base.gc_bytes())}, fblocknewargs.args)
     return Expr(:function,{funcsyntax(ex),Expr(:block,fblocknewargs...)}...), indx
 end
 
@@ -306,17 +304,17 @@ function profile_print(tc)
     # Display output
     for i = 1:length(tc)
         timers = tc[i][1]
-        byters = tc[i][1]
-        counters = tc[i][2]
-        println("   count  time(%)  time(s)  bytes(%)  bytes(k)")
+        byters = tc[i][2]
+        counters = tc[i][3]
+        println("  count  time(%)   time(s) bytes(%) bytes(k)")
         for j = 1:length(counters)
             if counters[j] != 0
                 comp_time = compensated_time(timers[j], counters[j])
-                @printf("%8d    %5.2f  %f %5.2f  %d %s\n", counters[j],
+                @printf("%8d  %5.2f  %9.6f  %5.2f  %8d  %s\n", counters[j],
                         100*(comp_time/ttotal),
                         comp_time*1e-9,
-                        100*(biters[j]/btotal),
-                        int(biters[j] / 1e3),
+                        100*(byters[j]/btotal),
+                        byters[j] / 1e3,
                         show_unquoted(PROFILE_TAGS[i][j]))
             end
         end
