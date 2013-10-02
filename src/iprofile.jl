@@ -1,5 +1,7 @@
 module IProfile
 
+gc_bytes() = ccall(:jl_gc_total_bytes, Csize_t, ())
+
 PROFILE_LINES = 1
 PROFILE_DESCEND = 2
 PROFILE_STATE = PROFILE_LINES | PROFILE_DESCEND    # state is a bitfield
@@ -24,7 +26,9 @@ function profile_calib(n_iter)
     trec = Array(Uint64, n_iter)
     for i = 1:n_iter
         tlast = time_ns()
+        blast = gc_bytes()
         tnow = time_ns()
+        bnow = gc_bytes()
         trec[i] = tnow - tlast
     end
     return trec
@@ -61,29 +65,30 @@ function funcsym(ex::Expr)
 end
 
 # Test for control-flow statements
-is_cf_expr(ex::Expr) = contains([:for, :while, :if, :try], ex.head)
+#is_cf_expr(ex::Expr) = contains([:for, :while, :if, :try], ex.head)
+is_cf_expr(ex::Expr) = in(ex.head, [:for, :while, :if, :try])
 is_cf_expr(ex) = false
 
 # General switchyard function
-function insert_profile(ex::Expr, tlast, tnow, timers, counters, tags, indx::Int, retsym, rettest)
+function insert_profile(ex::Expr, tlast, tnow, timers, blast, bnow, byters, counters, tags, indx::Int, retsym, rettest)
     if ex.head == :block
-        insert_profile_block(ex, tlast, tnow, timers, counters, tags, indx, retsym, rettest)
+        insert_profile_block(ex, tlast, tnow, timers, blast, bnow, byters, counters, tags, indx, retsym, rettest)
     elseif is_cf_expr(ex)
-        insert_profile_cf(ex, tlast, tnow, timers, counters, tags, indx, retsym)
+        insert_profile_cf(ex, tlast, tnow, timers, blast, bnow, byters, counters, tags, indx, retsym)
     else
         error("Don't know what to do")
     end
 end
 
 # A variant for anything but an expression (a no-op).
-insert_profile(notex, tlast, tnow, timers, counters, tags, indx::Int, retsym, rettest) = notex, indx
+insert_profile(notex, tlast, tnow, timers, blast, bnow, byters, counters, tags, indx::Int, retsym, rettest) = notex, indx
 
 # Insert profiling statements into a code block
 # rettest is a function with the following syntax:
 #    rettest(Expr, Int)
 # and evaluates to true if the return value of Expr needs to be saved
 # before inserting profiling statements.
-function insert_profile_block(fblock::Expr, tlast, tnow, timers, counters, tags, indx::Int, retsym, rettest)
+function insert_profile_block(fblock::Expr, tlast, tnow, timers, blast, bnow, byters, counters, tags, indx::Int, retsym, rettest)
     global PROFILE_STATE, PROFILE_DESCEND
     if fblock.head != :block
         println(fblock)
@@ -100,7 +105,7 @@ function insert_profile_block(fblock::Expr, tlast, tnow, timers, counters, tags,
         elseif descend && is_cf_expr(fblock.args[i])
             # This is a control-flow statement, it requires special
             # handling (recursive)
-            cfnew, indx = insert_profile_cf(fblock.args[i], tlast, tnow, timers, counters, tags, indx, retsym)
+            cfnew, indx = insert_profile_cf(fblock.args[i], tlast, tnow, timers, blast, bnow, byters, counters, tags, indx, retsym)
             push!(fblocknewargs, cfnew)
         else
             # This is an "ordinary" statement
@@ -121,7 +126,7 @@ function insert_profile_block(fblock::Expr, tlast, tnow, timers, counters, tags,
             #   timers[indx] += timehr_diff(tlast, tnow)
             #   counters[indx] += 1
             #   timehr(PROFILE_USE_CLOCK, tlast) # start time for next
-            append!(fblocknewargs,{:($tnow = time_ns()), :(($timers)[($indx)] += $tnow - $tlast), :(($counters)[($indx)] += 1), :($tlast = time_ns())})
+            append!(fblocknewargs,{:($tnow = time_ns()), :($bnow = gc_bytes()), :(($timers)[($indx)] += $tnow - $tlast),  :(($byters)[($indx)] += $bnow - $blast), :(($counters)[($indx)] += 1), :($tlast = time_ns()), :($blast = gc_bytes())})
             indx += 1
             if saveret
                 push!(fblocknewargs, :(return $retsym))
@@ -132,16 +137,16 @@ function insert_profile_block(fblock::Expr, tlast, tnow, timers, counters, tags,
 end
 
 # Handling control-flow statements
-function insert_profile_cf(ex::Expr, tlast, tnow, timers, counters, tags, indx::Int, retsym)
+function insert_profile_cf(ex::Expr, tlast, tnow, timers, blast, bnow, byters, counters, tags, indx::Int, retsym)
     rettest = (ex, i) -> is_expr_head(ex, :return)
     if length(ex.args) == 2
         # This is a for, while, or 2-argument if or try block
-        block1, indx = insert_profile(ex.args[2], tlast, tnow, timers, counters, tags, indx, retsym, rettest)
+        block1, indx = insert_profile(ex.args[2], tlast, tnow, timers, blast, bnow, byters, counters, tags, indx, retsym, rettest)
         return Expr(ex.head, {ex.args[1], block1}...), indx
     elseif length(ex.args) == 3
         # This is for a 3-argument if or try block
-        block1, indx = insert_profile(ex.args[2], tlast, tnow, timers, counters, tags, indx, retsym, rettest)
-        block2, indx = insert_profile(ex.args[3], tlast, tnow, timers, counters, tags, indx, retsym, rettest)
+        block1, indx = insert_profile(ex.args[2], tlast, tnow, timers, blast, bnow, byters, counters, tags, indx, retsym, rettest)
+        block2, indx = insert_profile(ex.args[3], tlast, tnow, timers, blast, bnow, byters, counters, tags, indx, retsym, rettest)
         return Expr(ex.head, {ex.args[1], block1, block2}...), indx
     else
         error("Wrong number of arguments")
@@ -156,7 +161,7 @@ end
 #   - Functions can be defined in "short-form" (e.g.,
 #     "isempty(x) = numel(x)==0"), and the return value for these
 #     needs to be managed, too
-function insert_profile_function(ex::Expr, tlast, tnow, timers, counters, tags, indx::Int, retsym)
+function insert_profile_function(ex::Expr, tlast, tnow, timers, blast, bnow, byters, counters, tags, indx::Int, retsym)
     fblock = ex.args[2]
     if fblock.head != :block
         error("Can't parse func expression")
@@ -178,9 +183,9 @@ function insert_profile_function(ex::Expr, tlast, tnow, timers, counters, tags, 
         savefunc = (ex, i) -> i == length(fblock.args) || is_expr_head(ex, :return)
     end
     # Insert the profiling statements in the function
-    fblocknewargs, indx = insert_profile_block(fblock, tlast, tnow, timers, counters, tags, indx, retsym, savefunc)
+    fblocknewargs, indx = insert_profile_block(fblock, tlast, tnow, timers, blast, bnow, byters, counters, tags, indx, retsym, savefunc)
     # Prepend the initialization of tlast
-    fblocknewargs = vcat({:($tlast = time_ns())}, fblocknewargs.args)
+    fblocknewargs = vcat({:($tlast = time_ns())}, {:($blast = gc_bytes())}, fblocknewargs.args)
     return Expr(:function,{funcsyntax(ex),Expr(:block,fblocknewargs...)}...), indx
 end
 
@@ -190,6 +195,9 @@ function profile_parse(ex::Expr)
         tlast = gensym()
         tnow = gensym()
         timers = gensym()
+        blast = gensym()
+        bnow = gensym()
+        byters = gensym()
         counters = gensym()
         # Keep track of line numbers
         tags = {}
@@ -209,7 +217,7 @@ function profile_parse(ex::Expr)
                     # Insert "global" statement for each function
                     push!(coreargs,Expr(:global,funcsym(ex.args[i])))
                     # Insert function-call counters
-                    newfuncexpr, indx = insert_profile_function(ex.args[i], tlast, tnow, timers, counters, tags, indx, retsym)
+                    newfuncexpr, indx = insert_profile_function(ex.args[i], tlast, tnow, timers, blast, bnow, byters, counters, tags, indx, retsym)
                     push!(coreargs, newfuncexpr)
                 else
                     push!(coreargs,ex.args[i])
@@ -218,7 +226,7 @@ function profile_parse(ex::Expr)
         elseif isfuncexpr(ex)
             # This is a single function declaration
             push!(coreargs,Expr(:global,funcsym(ex)))
-            newfuncexpr, indx = insert_profile_function(ex, tlast, tnow, timers, counters, tags, indx, retsym)
+            newfuncexpr, indx = insert_profile_function(ex, tlast, tnow, timers, blast, bnow, byters, counters, tags, indx, retsym)
             push!(coreargs, newfuncexpr)
         else
             error("Could not parse expression")
@@ -228,13 +236,13 @@ function profile_parse(ex::Expr)
         # Because we're using a gensym for the function name, we can't
         # quote the whole thing
         push!(coreargs, Expr(:global, funcreport))
-        push!(coreargs, Expr(:function, {Expr(:call, {funcreport}...), Expr(:block,{:(return $timers, $counters)}...)}...))
+        push!(coreargs, Expr(:function, {Expr(:call, {funcreport}...), Expr(:block,{:(return $timers, $byters, $counters)}...)}...))
         # Insert clearing function
         push!(coreargs, Expr(:global, funcclear))
-        push!(coreargs, Expr(:function, {Expr(:call, {funcclear}...), Expr(:block,{:(fill!($timers,0)), :(fill!($counters,0))}...)}...))
+        push!(coreargs, Expr(:function, {Expr(:call, {funcclear}...), Expr(:block,{:(fill!($timers,0)), :(fill!($byters,0)), :(fill!($counters,0))}...)}...))
         # Put all this inside a let block
         excore = Expr(:block,coreargs...)
-        exlet = Expr(:let,{Expr(:block,excore), :($timers = zeros(Uint64, $n_lines)), :($counters = zeros(Uint64, $n_lines))}...)
+        exlet = Expr(:let,{Expr(:block,excore), :($timers = zeros(Uint64, $n_lines)), :($byters = zeros(Uint64, $n_lines)), :($counters = zeros(Uint64, $n_lines))}...)
         # Export the reporting and clearing functions, in case we're inside a module
         exret = Expr(:toplevel, {esc(exlet), Expr(:export, {esc(funcclear), esc(funcreport)}...)}...)
         return exret, tags, funcreport, funcclear
@@ -284,25 +292,31 @@ show_linenumber(line, file) = string("\t#  ",file,", line ",line)
 function profile_print(tc)
     # Compute total elapsed time
     ttotal = 0.0
+    btotal = 0.0
     for i = 1:length(tc)
         timers = tc[i][1]
-        counters = tc[i][2]
+        byters = tc[i][2]
+        counters = tc[i][3]
         for j = 1:length(counters)
             comp_time = compensated_time(timers[j], counters[j])
             ttotal += comp_time
+            btotal += byters[j]
         end
     end
     # Display output
     for i = 1:length(tc)
         timers = tc[i][1]
+        byters = tc[i][1]
         counters = tc[i][2]
-        println("   count  time(%)  time(s)")
+        println("   count  time(%)  time(s)  bytes(%)  bytes(k)")
         for j = 1:length(counters)
             if counters[j] != 0
                 comp_time = compensated_time(timers[j], counters[j])
-                @printf("%8d    %5.2f  %f %s\n", counters[j],
+                @printf("%8d    %5.2f  %f %5.2f  %d %s\n", counters[j],
                         100*(comp_time/ttotal),
                         comp_time*1e-9,
+                        100*(biters[j]/btotal),
+                        int(biters[j] / 1e3),
                         show_unquoted(PROFILE_TAGS[i][j]))
             end
         end
