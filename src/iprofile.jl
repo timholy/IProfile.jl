@@ -108,7 +108,7 @@ function insert_profile_block(fblock::Expr, tlast, tnow, timers, blast, bnow, by
         else
             # This is an "ordinary" statement
             saveret = rettest(fblock, i)
-            push!(tags,lasttag)
+            push!(tags, {lasttag, fblock.args[i]})
             if saveret
                 if is_expr_head(fblock.args[i], :return)
                     push!(fblocknewargs, :($retsym = $(fblock.args[i].args[1])))
@@ -282,10 +282,18 @@ function profile_report()
 end
 
 compensated_time(t, c) = t >= c*PROFILE_CALIB ? t-c*PROFILE_CALIB : 0
-show_unquoted(linex::Expr) = show_linenumber(linex.args...)
-show_unquoted(lnn::LineNumberNode) = show_linenumber(lnn.line)
-show_linenumber(line)       = string("\t#  line ",line)
-show_linenumber(line, file) = string("\t#  ",file,", line ",line)
+function show_unquoted(arg::Array{Any,1})
+  if length(arg[1].args)==1
+    ret_val = string("\t# line ", arg[1].args[1])
+  else
+    ret_val = string("\t# ", arg[1].args[2], ", line ", arg[1].args[1])
+  end
+  ret_val = string(ret_val, ", ", string(arg[2]))
+end
+#show_unquoted(linex::Expr) = show_linenumber(linex.args...)
+#show_unquoted(lnn::LineNumberNode) = show_linenumber(lnn.line)
+#show_linenumber(line)       = string("\t#  line ",line)
+#show_linenumber(line, file) = string("\t#  ",file,", line ",line)
 
 function profile_print(tc)
     # Compute total elapsed time
