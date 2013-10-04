@@ -1,3 +1,6 @@
+import Profile
+using Profile.IProfile
+
 @iprofile begin
 function f1(x::Int)
     k = 5

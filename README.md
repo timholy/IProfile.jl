@@ -6,6 +6,12 @@ are mainly used for code optimization, particularly to find bottlenecks.
 This package implements two [types of profilers][wp], an "instrumenting"
 profiler and a "sampling" (statistical) profiler.
 
+### Sampling profiler is now in base
+
+Note that an improved version of the sampling profiler has been moved to Julia proper.
+There should be little reason to use the sampling profiler in this package.
+See the [documentation](http://docs.julialang.org/en/latest/stdlib/profile/).
+
 ### Instrumenting profiler
 
 The instrumenting profiler provides detailed information, including the number
