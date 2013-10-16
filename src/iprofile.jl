@@ -32,7 +32,7 @@ function profile_calib(n_iter)
     return trec
 end
 end
-PROFILE_CALIB = min(profile_calib(100))
+PROFILE_CALIB = minimum(profile_calib(100))
 
 # Utilities
 # Generic expression type testing
