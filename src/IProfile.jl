@@ -1,5 +1,7 @@
 module IProfile
 
+export @iprofile
+
 PROFILE_LINES = 1
 PROFILE_DESCEND = 2
 PROFILE_STATE = PROFILE_LINES | PROFILE_DESCEND    # state is a bitfield
