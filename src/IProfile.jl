@@ -323,7 +323,7 @@ function profile_print(tc)
                 @printf("%8d  %5.2f  %9.6f  %5.2f  %8d  %s\n", counters[j],
                         100*(comp_time/ttotal),
                         comp_time*1e-9,
-                        100*(byters[j]/btotal),
+                        btotal > 0.0? 100*(byters[j]/btotal) : 0.0,
                         byters[j] / 1e3,
                         show_unquoted(PROFILE_TAGS[i][j]))
             end
