@@ -6,7 +6,12 @@ are mainly used for code optimization, particularly to find bottlenecks.
 ### Sampling profiler is now in base
 
 This package used to contain a sampling profiler, but that has been moved to Julia proper.
-See the [documentation](http://docs.julialang.org/en/latest/stdlib/profile/).
+The built-in sampling profiler has far fewer limitations than this package, and is recommended
+over this one in essentially all cases.
+See the [documentation](http://docs.julialang.org/en/latest/manual/profile/) and [API reference](http://docs.julialang.org/en/latest/stdlib/profile/).
+
+Because the sampling profiler is so much better, I am not fixing bugs in this package anymore.
+However, I am happy to accept pull requests.
 
 ### Instrumenting profiler
 
