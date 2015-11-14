@@ -39,7 +39,7 @@ f1(7.3)
 println("Less than 0.5: ", f2())
 
 for i = 1:200
-    f1(int16(i))
+    f1(Int16(i))
 end
 
 @iprofile report
