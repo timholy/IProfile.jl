@@ -96,6 +96,7 @@ function insert_profile_block(fblock::Expr, tlast, tnow, timers, blast, bnow, by
     end
     descend = PROFILE_STATE & PROFILE_DESCEND > 0
     fblocknewargs = []
+    local lasttag
     for i = 1:length(fblock.args)
         if isa(fblock.args[i],LineNumberNode) || is_expr_head(fblock.args[i], :line)
             # This is a line expression, so no counters/timers required
