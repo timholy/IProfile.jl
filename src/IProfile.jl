@@ -20,10 +20,10 @@ PROFILE_TAGS = []     # line #s for all timing variables
 PROFILE_CALIB = 0
 # Do it inside a let block, just like in real profiling, in case of
 # extra overhead
-let # tlast::Uint64 = 0x0, tnow::Uint64 = 0x0
+let # tlast::UInt64 = 0x0, tnow::UInt64 = 0x0
 global profile_calib
 function profile_calib(n_iter)
-    trec = Array(Uint64, n_iter)
+    trec = Array(UInt64, n_iter)
     for i = 1:n_iter
         tlast = time_ns()
         blast = Base.gc_bytes()
@@ -243,7 +243,7 @@ function profile_parse(ex::Expr)
         push!(coreargs, Expr(:function, Any[Expr(:call, Any[funcclear]...), Expr(:block,Any[:(fill!($timers,0)), :(fill!($byters,0)), :(fill!($counters,0))]...)]...))
         # Put all this inside a let block
         excore = Expr(:block,coreargs...)
-        exlet = Expr(:let,Any[Expr(:block,excore), :($timers = zeros(Uint64, $n_lines)), :($byters = zeros(Uint64, $n_lines)), :($counters = zeros(Uint64, $n_lines))]...)
+        exlet = Expr(:let,Any[Expr(:block,excore), :($timers = zeros(UInt64, $n_lines)), :($byters = zeros(UInt64, $n_lines)), :($counters = zeros(UInt64, $n_lines))]...)
         # Export the reporting and clearing functions, in case we're inside a module
         exret = Expr(:toplevel, Any[esc(exlet), Expr(:export, Any[esc(funcclear), esc(funcreport)]...)]...)
         return exret, tags, funcreport, funcclear
