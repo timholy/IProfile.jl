@@ -274,7 +274,7 @@ function profile_parse_all()
 end
 
 function profile_report()
-    exret = cell(length(PROFILE_REPORTS)+2)
+    exret = Array{Any}(length(PROFILE_REPORTS)+2)
     ret = gensym()
     exret[1] = :($ret = [])
     for i = 1:length(PROFILE_REPORTS)
@@ -333,7 +333,7 @@ function profile_print(tc)
 end
 
 function profile_clear()
-    exret = cell(length(PROFILE_CLEARS)+1)
+    exret = Array{Any}(length(PROFILE_CLEARS)+1)
     for i = 1:length(PROFILE_CLEARS)
         exret[i] = Expr(:call,Any[PROFILE_CLEARS[i]]...)
     end
