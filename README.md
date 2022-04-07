@@ -8,7 +8,7 @@ are mainly used for code optimization, particularly to find bottlenecks.
 This package used to contain a sampling profiler, but that has been moved to Julia proper.
 The built-in sampling profiler has far fewer limitations than this package, and is recommended
 over this one in essentially all cases.
-See the [documentation](http://docs.julialang.org/en/latest/manual/profile/) and [API reference](http://docs.julialang.org/en/latest/stdlib/profile/).
+See the [documentation](https://docs.julialang.org/en/v1/manual/profile/) and [API reference](https://docs.julialang.org/en/v1/stdlib/Profile/).
 
 Because the sampling profiler is so much better, I am not fixing bugs in this package anymore.
 However, I am happy to accept pull requests.
